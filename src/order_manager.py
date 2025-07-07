@@ -15,9 +15,7 @@ from reportlab.lib.pagesizes import A4, letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.pdfgen import canvas
-from reportlab.platypus import (
-    Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
-)
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 log_dir = os.path.join(os.getcwd(), "logs")
 if not os.path.exists(log_dir):
@@ -26,9 +24,7 @@ log_file = os.path.join(log_dir, "medibit_app.log")
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    handlers=[
-        RotatingFileHandler(log_file, maxBytes=2 * 1024 * 1024, backupCount=5)
-    ],
+    handlers=[RotatingFileHandler(log_file, maxBytes=2 * 1024 * 1024, backupCount=5)],
 )
 order_logger = logging.getLogger("medibit.order")
 
@@ -60,9 +56,7 @@ class OrderManager:
         os.makedirs(orders_dir, exist_ok=True)
 
         # Generate filename
-        filename = (
-            f"order_{order_id}_{timestamp.replace(':','-').replace(' ','_')}.pdf"
-        )
+        filename = f"order_{order_id}_{timestamp.replace(':','-').replace(' ','_')}.pdf"
         filepath = os.path.join(orders_dir, filename)
 
         # Create PDF document
@@ -293,13 +287,11 @@ class OrderManager:
                 email=pharmacy_details.email,
             )
         else:
-            footer_text = (
-                """
+            footer_text = """
                 Thank you for your business!<br/>
                 medibit Pharmacy Management System<br/>
                 This is a computer generated order.
                 """
-            )
 
         footer = Paragraph(footer_text, footer_style)
         story.append(footer)
@@ -447,9 +439,7 @@ medibit Pharmacy Team
             """
 
             # Send WhatsApp message
-            url = (
-                f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
-            )
+            url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
             from_number = "whatsapp:+14155238886"  # Twilio WhatsApp sandbox
             to_number = f"whatsapp:{supplier_info['phone']}"
 

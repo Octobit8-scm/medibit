@@ -19,11 +19,7 @@ log_file = os.path.join(log_dir, "medibit_app.log")
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    handlers=[
-        RotatingFileHandler(
-            log_file, maxBytes=2 * 1024 * 1024, backupCount=5
-        )
-    ],
+    handlers=[RotatingFileHandler(log_file, maxBytes=2 * 1024 * 1024, backupCount=5)],
 )
 db_logger = logging.getLogger("medibit.db")
 
@@ -180,9 +176,7 @@ def update_medicine_threshold(barcode, threshold):
         session.close()
 
 
-def update_medicine(
-    barcode, name, quantity, expiry, manufacturer, price, threshold
-):
+def update_medicine(barcode, name, quantity, expiry, manufacturer, price, threshold):
     session = Session()
     try:
         medicine = session.query(Medicine).filter_by(barcode=barcode).first()
@@ -221,15 +215,11 @@ def update_medicine_quantity(barcode, new_quantity):
         session.close()
 
 
-def add_medicine(
-    barcode, name, quantity, expiry, manufacturer, price=0, threshold=10
-):
+def add_medicine(barcode, name, quantity, expiry, manufacturer, price=0, threshold=10):
     session = Session()
     try:
         # Check if medicine with this barcode already exists
-        existing_medicine = (
-            session.query(Medicine).filter_by(barcode=barcode).first()
-        )
+        existing_medicine = session.query(Medicine).filter_by(barcode=barcode).first()
 
         if existing_medicine:
             # Update existing medicine
@@ -242,8 +232,7 @@ def add_medicine(
             session.commit()
             return (
                 True,
-                f"Updated existing medicine '{name}' and added "
-                f"{quantity} units",
+                f"Updated existing medicine '{name}' and added " f"{quantity} units",
             )
         else:
             # Create new medicine
@@ -274,9 +263,7 @@ def get_low_stock_medicines():
     session = Session()
     # Use individual thresholds instead of global threshold
     medicines = (
-        session.query(Medicine)
-        .filter(Medicine.quantity < Medicine.threshold)
-        .all()
+        session.query(Medicine).filter(Medicine.quantity < Medicine.threshold).all()
     )
     session.close()
     return medicines
@@ -301,9 +288,7 @@ def add_order(timestamp, file_path, medicines):
             name = getattr(med, "name", None)
             quantity = getattr(med, "quantity", None)
             expiry = (
-                str(getattr(med, "expiry", ""))
-                if getattr(med, "expiry", None)
-                else ""
+                str(getattr(med, "expiry", "")) if getattr(med, "expiry", None) else ""
             )
             manufacturer = getattr(med, "manufacturer", "") or ""
             order_quantity = getattr(med, "order_quantity", None)
@@ -328,9 +313,7 @@ def get_all_orders():
     orders = session.query(Order).order_by(Order.id.desc()).all()
     # Eager load medicines
     for order in orders:
-        order.meds = (
-            session.query(OrderMedicine).filter_by(order_id=order.id).all()
-        )
+        order.meds = session.query(OrderMedicine).filter_by(order_id=order.id).all()
     session.close()
     return orders
 
@@ -358,9 +341,7 @@ def get_all_bills():
     session = Session()
     bills = session.query(Bill).order_by(Bill.id.desc()).all()
     for bill in bills:
-        bill.items_list = (
-            session.query(BillItem).filter_by(bill_id=bill.id).all()
-        )
+        bill.items_list = session.query(BillItem).filter_by(bill_id=bill.id).all()
     session.close()
     return bills
 
@@ -379,9 +360,7 @@ def get_monthly_sales():
         for bill in bills:
             # Parse the bill's timestamp to get year and month
             try:
-                dt = datetime.datetime.strptime(
-                    bill.timestamp[:10], "%Y-%m-%d"
-                )
+                dt = datetime.datetime.strptime(bill.timestamp[:10], "%Y-%m-%d")
             except Exception:
                 continue
             key = (dt.year, dt.month)

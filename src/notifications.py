@@ -16,11 +16,7 @@ log_file = os.path.join(log_dir, "medibit_app.log")
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    handlers=[
-        RotatingFileHandler(
-            log_file, maxBytes=2 * 1024 * 1024, backupCount=5
-        )
-    ],
+    handlers=[RotatingFileHandler(log_file, maxBytes=2 * 1024 * 1024, backupCount=5)],
 )
 notif_logger = logging.getLogger("medibit.notifications")
 
@@ -86,9 +82,7 @@ class NotificationManager:
                 body += f"  Manufacturer: {med.manufacturer or 'N/A'}\n\n"
 
             body += "\nPlease take necessary action to restock these items.\n"
-            body += (
-                f"\nGenerated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-            )
+            body += f"\nGenerated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
 
             msg.attach(MIMEText(body, "plain"))
 
@@ -113,10 +107,7 @@ class NotificationManager:
             )
 
         except smtplib.SMTPAuthenticationError as e:
-            if (
-                "534" in str(e)
-                and "application specific password" in str(e).lower()
-            ):
+            if "534" in str(e) and "application specific password" in str(e).lower():
                 return (
                     False,
                     f"Email alert failed: Gmail requires an App Password. Please generate one at: "
@@ -164,9 +155,7 @@ class NotificationManager:
             for phone in self.config["whatsapp"]["phone_numbers"]:
                 try:
                     # Twilio WhatsApp API endpoint
-                    url = (
-                        f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
-                    )
+                    url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
 
                     # For WhatsApp, use the whatsapp: prefix
                     from_number = (
@@ -313,17 +302,13 @@ class NotificationManager:
             msg["Subject"] = (
                 f"Daily Sales Summary - {datetime.now().strftime('%Y-%m-%d')}"
             )
-            body = (
-                f"Daily Sales Summary for {datetime.now().strftime('%Y-%m-%d')}\n\n"
-            )
+            body = f"Daily Sales Summary for {datetime.now().strftime('%Y-%m-%d')}\n\n"
             body += f"Total Sales: ₹{sales_summary['total']:.2f}\n"
             body += f"Number of Bills: {sales_summary['count']}\n"
             body += f"Average Bill: ₹{sales_summary['avg']:.2f}\n\n"
             body += "Bill Details:\n"
             for bill in bill_details:
-                body += (
-                    f"- Time: {bill['time']}, Amount: ₹{bill['total']:.2f}\n"
-                )
+                body += f"- Time: {bill['time']}, Amount: ₹{bill['total']:.2f}\n"
             body += "\nThis is an automated message."
             msg.attach(MIMEText(body, "plain"))
             server = smtplib.SMTP(
@@ -364,9 +349,7 @@ class NotificationManager:
             message += f"*Average Bill:* ₹{sales_summary['avg']:.2f}\n\n"
             message += "*Bill Details:*\n"
             for bill in bill_details:
-                message += (
-                    f"- Time: {bill['time']}, Amount: ₹{bill['total']:.2f}\n"
-                )
+                message += f"- Time: {bill['time']}, Amount: ₹{bill['total']:.2f}\n"
             message += "\n_Automated message from Medibit Pharmacy_"
             success_count = 0
             for phone in self.config["whatsapp"]["phone_numbers"]:

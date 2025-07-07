@@ -72,9 +72,7 @@ class AddMedicineDialog(QDialog):
             "Note: If a medicine with this barcode already exists, the "
             "quantity will be added to the existing stock."
         )
-        note_label.setStyleSheet(
-            "color: #666; font-size: 11px; font-style: italic;"
-        )
+        note_label.setStyleSheet("color: #666; font-size: 11px; font-style: italic;")
         note_label.setWordWrap(True)
         layout.addRow(note_label)
 
@@ -168,9 +166,7 @@ class NotificationSettingsDialog(QDialog):
         email_group = QWidget()
         email_layout = QVBoxLayout(email_group)
         email_title = QLabel("Email Notifications")
-        email_title.setStyleSheet(
-            "font-size: 16px; font-weight: bold; color: #1976d2;"
-        )
+        email_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #1976d2;")
         email_layout.addWidget(email_title)
 
         # Email enable checkbox
@@ -187,9 +183,7 @@ class NotificationSettingsDialog(QDialog):
         )
         self.smtp_port = QSpinBox()
         self.smtp_port.setRange(1, 65535)
-        self.smtp_port.setValue(
-            self.notification_manager.config["email"]["smtp_port"]
-        )
+        self.smtp_port.setValue(self.notification_manager.config["email"]["smtp_port"])
         self.sender_email = QLineEdit(
             self.notification_manager.config["email"]["sender_email"]
         )
@@ -201,9 +195,7 @@ class NotificationSettingsDialog(QDialog):
             "Use App Password for Gmail (not regular password)"
         )
         self.recipient_emails = QLineEdit(
-            ", ".join(
-                self.notification_manager.config["email"]["recipient_emails"]
-            )
+            ", ".join(self.notification_manager.config["email"]["recipient_emails"])
         )
         self.recipient_emails.setPlaceholderText(
             "email1@example.com, email2@example.com"
@@ -215,9 +207,7 @@ class NotificationSettingsDialog(QDialog):
             "regular password.\nGo to Google Account → Security → 2-Step Verification "
             "→ App passwords"
         )
-        gmail_note.setStyleSheet(
-            "color: #666; font-size: 11px; font-style: italic;"
-        )
+        gmail_note.setStyleSheet("color: #666; font-size: 11px; font-style: italic;")
         gmail_note.setWordWrap(True)
 
         email_form.addRow("SMTP Server:", self.smtp_server)
@@ -249,17 +239,11 @@ class NotificationSettingsDialog(QDialog):
         self.whatsapp_api_key = QLineEdit(
             self.notification_manager.config["whatsapp"]["api_key"]
         )
-        self.whatsapp_api_key.setPlaceholderText(
-            "Account SID:Auth Token (for Twilio)"
-        )
+        self.whatsapp_api_key.setPlaceholderText("Account SID:Auth Token (for Twilio)")
         self.whatsapp_phone_numbers = QLineEdit(
-            ", ".join(
-                self.notification_manager.config["whatsapp"]["phone_numbers"]
-            )
+            ", ".join(self.notification_manager.config["whatsapp"]["phone_numbers"])
         )
-        self.whatsapp_phone_numbers.setPlaceholderText(
-            "+1234567890, +0987654321"
-        )
+        self.whatsapp_phone_numbers.setPlaceholderText("+1234567890, +0987654321")
 
         whatsapp_form.addRow("API Key:", self.whatsapp_api_key)
         whatsapp_form.addRow("Phone Numbers:", self.whatsapp_phone_numbers)
@@ -272,9 +256,7 @@ class NotificationSettingsDialog(QDialog):
             "• Use sandbox for testing\n"
             "• Format: Account SID:Auth Token"
         )
-        whatsapp_note.setStyleSheet(
-            "color: #666; font-size: 11px; font-style: italic;"
-        )
+        whatsapp_note.setStyleSheet("color: #666; font-size: 11px; font-style: italic;")
         whatsapp_note.setWordWrap(True)
         whatsapp_layout.addWidget(whatsapp_note)
 
@@ -282,30 +264,20 @@ class NotificationSettingsDialog(QDialog):
         sms_group = QWidget()
         sms_layout = QVBoxLayout(sms_group)
         sms_title = QLabel("SMS Notifications")
-        sms_title.setStyleSheet(
-            "font-size: 16px; font-weight: bold; color: #ff6b35;"
-        )
+        sms_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #ff6b35;")
         sms_layout.addWidget(sms_title)
 
         # SMS enable checkbox
         self.sms_enabled = QCheckBox("Enable SMS Notifications")
-        self.sms_enabled.setChecked(
-            self.notification_manager.config["sms"]["enabled"]
-        )
+        self.sms_enabled.setChecked(self.notification_manager.config["sms"]["enabled"])
         sms_layout.addWidget(self.sms_enabled)
 
         # SMS form
         sms_form = QFormLayout()
-        self.sms_api_key = QLineEdit(
-            self.notification_manager.config["sms"]["api_key"]
-        )
+        self.sms_api_key = QLineEdit(self.notification_manager.config["sms"]["api_key"])
         self.sms_api_key.setPlaceholderText("Account SID:Auth Token")
-        self.sms_phone_numbers = QLineEdit(
-            "+919923706784, +919876543210"
-        )
-        self.sms_phone_numbers.setPlaceholderText(
-            "+919923706784, +919876543210"
-        )
+        self.sms_phone_numbers = QLineEdit("+919923706784, +919876543210")
+        self.sms_phone_numbers.setPlaceholderText("+919923706784, +919876543210")
 
         sms_form.addRow("API Key:", self.sms_api_key)
         sms_form.addRow("Phone Numbers:", self.sms_phone_numbers)

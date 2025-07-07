@@ -1,5 +1,6 @@
 import json
 import os
+
 import requests
 
 
@@ -69,9 +70,7 @@ class CloudStorage:
 
             with open(pdf_path, "rb") as f:
                 files = {"file": f}
-                response = requests.post(
-                    self.config["upload_url"], files=files
-                )
+                response = requests.post(self.config["upload_url"], files=files)
 
             if response.status_code == 200:
                 result = response.json()
