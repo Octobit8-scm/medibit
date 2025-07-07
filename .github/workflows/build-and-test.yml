@@ -64,9 +64,9 @@ jobs:
       - name: Debug Path
         run: |
           echo "PWD: $PWD"
-          echo "PYTHONPATH: $PYTHONPATH"
-          ls -l
-          ls -l tests
+          echo "PYTHONPATH: $env:PYTHONPATH"
+          dir
+          dir tests
 
       - name: Run Tests
         run: pytest tests/ --disable-warnings -v
