@@ -61,6 +61,13 @@ jobs:
           path: C:\ProgramData\chocolatey\lib\innosetup
           key: ${{ runner.os }}-innosetup
 
+      - name: Debug Path
+        run: |
+          echo "PWD: $PWD"
+          echo "PYTHONPATH: $PYTHONPATH"
+          ls -l
+          ls -l tests
+
       - name: Run Tests
         run: |
           pytest tests/ --disable-warnings -v
