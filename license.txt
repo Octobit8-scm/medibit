@@ -1,0 +1,28 @@
+MEDIBIT PHARMACY END-USER LICENSE AGREEMENT (EULA)
+
+IMPORTANT: PLEASE READ THIS LICENSE CAREFULLY BEFORE USING THIS SOFTWARE.
+
+This End-User License Agreement ("EULA") is a legal agreement between you (either an individual or a single entity) and Octobit8 ("Publisher") for the software product identified above, which includes computer software and may include associated media, printed materials, and online or electronic documentation ("SOFTWARE PRODUCT").
+
+BY INSTALLING, COPYING, OR OTHERWISE USING THE SOFTWARE PRODUCT, YOU AGREE TO BE BOUND BY THE TERMS OF THIS EULA. IF YOU DO NOT AGREE TO THE TERMS OF THIS EULA, DO NOT INSTALL OR USE THE SOFTWARE PRODUCT.
+
+1. GRANT OF LICENSE. The Publisher grants you a non-exclusive, non-transferable license to use the SOFTWARE PRODUCT for your internal business purposes, subject to the terms of this EULA.
+
+2. RESTRICTIONS. You may not:
+   - Reverse engineer, decompile, or disassemble the SOFTWARE PRODUCT.
+   - Rent, lease, or lend the SOFTWARE PRODUCT.
+   - Transfer the SOFTWARE PRODUCT to any third party without the Publisher's prior written consent.
+
+3. COPYRIGHT. The SOFTWARE PRODUCT is licensed, not sold. All title and copyrights in and to the SOFTWARE PRODUCT (including but not limited to any images, photographs, animations, video, audio, music, text, and "applets" incorporated into the SOFTWARE PRODUCT), the accompanying printed materials, and any copies of the SOFTWARE PRODUCT are owned by the Publisher.
+
+4. TERMINATION. Without prejudice to any other rights, the Publisher may terminate this EULA if you fail to comply with the terms and conditions of this EULA. In such event, you must destroy all copies of the SOFTWARE PRODUCT.
+
+5. NO WARRANTIES. The Publisher expressly disclaims any warranty for the SOFTWARE PRODUCT. The SOFTWARE PRODUCT is provided "As Is" without any express or implied warranty of any kind.
+
+6. LIMITATION OF LIABILITY. In no event shall the Publisher be liable for any damages (including, without limitation, lost profits, business interruption, or lost information) arising out of the use of or inability to use the SOFTWARE PRODUCT.
+
+7. GOVERNING LAW. This EULA shall be governed by the laws of your jurisdiction.
+
+If you have any questions about this EULA, please contact Octobit8 at https://octobit8.com/support.
+
+© 2024 Octobit8. All rights reserved. 

@@ -1,0 +1,112 @@
+# Created by venv; see https://docs.python.org/3/library/venv.html
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+*.so
+*.dll
+*.dylib
+
+# Distribution / packaging
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+*.manifest
+*.spec
+*.exe
+*.msi
+*.app
+*.deb
+*.rpm
+*.whl
+*.zip
+*.tar.gz
+*.bak
+*.tmp
+*.old
+*.log
+*.out
+*.coverage
+.coverage.*
+.cache/
+
+# Installer scripts and output
+*.iss
+*.bat
+Output/
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# PyInstaller
+*.spec
+*.manifest
+*.tmp
+*.log
+
+# Inno Setup output
+Output/
+
+# Database
+*.db
+*.sqlite3
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Icon?
+Desktop.ini
+$RECYCLE.BIN/
+
+# IDEs and editors
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+*.code-workspace
+*.swp
+*.bak
+*.orig
+*.tmp
+
+# Pre-commit
+.pre-commit-cache/
+
+# Receipts and generated files
+receipts/
+public/
+
+# Config and secrets
+config.json
+notification_config.json
+
+# Test and coverage
+htmlcov/
+.tox/
+.nox/
+.pytest_cache/
+.coverage
+coverage.xml
+*.cover
+
+# CI/CD
+.github/workflows/*.log
+
+# Misc
+*.bak
+*.orig
+*.tmp
+*.rej
+*.swo
+*.swn
+
+# Release and notes
+RELEASE_NOTES.txt

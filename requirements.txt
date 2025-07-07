@@ -1,0 +1,7 @@
+SQLAlchemy
+opencv-python
+pyzbar 
+reportlab
+requests
+pyqt5
+qtawesome
