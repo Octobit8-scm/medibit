@@ -1,4 +1,4 @@
-from db import get_monthly_sales
+from src.db import get_monthly_sales
 
 def test_get_monthly_sales():
     sales = get_monthly_sales()
