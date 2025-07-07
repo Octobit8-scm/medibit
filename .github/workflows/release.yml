@@ -30,6 +30,7 @@ jobs:
 
       - name: Run Tests
         run: |
+          echo "PYTHONPATH=$PWD" >> $GITHUB_ENV
           pytest tests/ --disable-warnings -v
 
       - name: Build EXE and Installer
