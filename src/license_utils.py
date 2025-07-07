@@ -5,7 +5,9 @@ import json
 from datetime import datetime, timedelta
 
 # CHANGE THIS SECRET KEY and keep it private!
-SECRET_KEY = b"medibit-2024-very-secret-key"  # Use a strong, private key in production
+SECRET_KEY = (
+    b"medibit-2024-very-secret-key"  # Use a strong, private key in production
+)
 
 
 def generate_license_key(customer_name, expiry_date):
@@ -18,7 +20,9 @@ def generate_license_key(customer_name, expiry_date):
     data = {"name": customer_name, "exp": expiry_date}
     data_json = json.dumps(data, separators=(",", ":"))
     data_b64 = base64.urlsafe_b64encode(data_json.encode()).decode()
-    signature = hmac.new(SECRET_KEY, data_b64.encode(), hashlib.sha256).digest()
+    signature = hmac.new(
+        SECRET_KEY, data_b64.encode(), hashlib.sha256
+    ).digest()
     sig_b64 = base64.urlsafe_b64encode(signature).decode()
     return f"{data_b64}.{sig_b64}"
 
@@ -33,7 +37,9 @@ def verify_license_key(license_key):
         data_b64, sig_b64 = license_key.split(".")
         data_json = base64.urlsafe_b64decode(data_b64.encode()).decode()
         data = json.loads(data_json)
-        expected_sig = hmac.new(SECRET_KEY, data_b64.encode(), hashlib.sha256).digest()
+        expected_sig = hmac.new(
+            SECRET_KEY, data_b64.encode(), hashlib.sha256
+        ).digest()
         actual_sig = base64.urlsafe_b64decode(sig_b64.encode())
         if not hmac.compare_digest(expected_sig, actual_sig):
             return False, None, "Invalid signature"

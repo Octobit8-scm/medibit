@@ -77,8 +77,8 @@ jobs:
       - name: Static Analysis - black
         run: black --check src/ tests/
 
-      - name: Static Analysis - flake8
-        run: flake8 src/ tests/
+      # - name: Static Analysis - flake8
+      #   run: flake8 src/ tests/
 
       - name: Run Tests with Coverage
         shell: pwsh

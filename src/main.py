@@ -17,7 +17,8 @@ if __name__ == "__main__":
 
         from PyQt5.QtGui import QIcon
 
-        # Try to use the existing ICO file first (preferred for Windows taskbar)
+        # Try to use the existing ICO file first (preferred for Windows
+        # taskbar)
         if os.path.exists("medibit.ico"):
             app_icon = QIcon("medibit.ico")
             # Set window icon for Windows taskbar

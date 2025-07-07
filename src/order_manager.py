@@ -15,7 +15,9 @@ from reportlab.lib.pagesizes import A4, letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.pdfgen import canvas
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import (
+    Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+)
 
 log_dir = os.path.join(os.getcwd(), "logs")
 if not os.path.exists(log_dir):
@@ -24,7 +26,9 @@ log_file = os.path.join(log_dir, "medibit_app.log")
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    handlers=[RotatingFileHandler(log_file, maxBytes=2 * 1024 * 1024, backupCount=5)],
+    handlers=[
+        RotatingFileHandler(log_file, maxBytes=2 * 1024 * 1024, backupCount=5)
+    ],
 )
 order_logger = logging.getLogger("medibit.order")
 
@@ -56,7 +60,9 @@ class OrderManager:
         os.makedirs(orders_dir, exist_ok=True)
 
         # Generate filename
-        filename = f"order_{order_id}_{timestamp.replace(':','-').replace(' ','_')}.pdf"
+        filename = (
+            f"order_{order_id}_{timestamp.replace(':','-').replace(' ','_')}.pdf"
+        )
         filepath = os.path.join(orders_dir, filename)
 
         # Create PDF document
@@ -272,19 +278,28 @@ class OrderManager:
         )
 
         if pharmacy_details:
-            footer_text = f"""
-            Thank you for your business!<br/>
-            {pharmacy_details.name}<br/>
-            {pharmacy_details.address}<br/>
-            Phone: {pharmacy_details.phone} | Email: {pharmacy_details.email}<br/>
-            This is a computer generated order.
-            """
+            footer_text = (
+                """
+                Thank you for your business!<br/>
+                {name}<br/>
+                {address}<br/>
+                Phone: {phone} | Email: {email}<br/>
+                This is a computer generated order.
+                """
+            ).format(
+                name=pharmacy_details.name,
+                address=pharmacy_details.address,
+                phone=pharmacy_details.phone,
+                email=pharmacy_details.email,
+            )
         else:
-            footer_text = """
-            Thank you for your business!<br/>
-            medibit Pharmacy Management System<br/>
-            This is a computer generated order.
-            """
+            footer_text = (
+                """
+                Thank you for your business!<br/>
+                medibit Pharmacy Management System<br/>
+                This is a computer generated order.
+                """
+            )
 
         footer = Paragraph(footer_text, footer_style)
         story.append(footer)
@@ -308,7 +323,8 @@ class OrderManager:
             msg["From"] = self.config["email"]["sender_email"]
             msg["To"] = supplier_info["email"]
             msg["Subject"] = (
-                f"Purchase Order #{order_id} - medibit Pharmacy - {datetime.now().strftime('%Y-%m-%d')}"
+                f"Purchase Order #{order_id} - medibit Pharmacy - "
+                f"{datetime.now().strftime('%Y-%m-%d')}"
             )
 
             # Email body
@@ -327,7 +343,10 @@ class OrderManager:
             """
 
             for item in order_items:
-                body += f"- {item['name']} (Barcode: {item['barcode']}) - Qty: {item['order_quantity']}\n"
+                body += (
+                    f"- {item['name']} (Barcode: {item['barcode']}) - "
+                    f"Qty: {item['order_quantity']}\n"
+                )
 
             body += f"""
             
@@ -410,7 +429,10 @@ Please find our purchase order details:
 
             # Add items to message
             for i, item in enumerate(order_items, 1):
-                message += f"• {item['name']} - Qty: {item['order_quantity']} (Barcode: {item['barcode']})\n"
+                message += (
+                    f"• {item['name']} - Qty: {item['order_quantity']} "
+                    f"(Barcode: {item['barcode']})\n"
+                )
 
             message += f"""
 📄 *PDF Order:*
@@ -425,7 +447,9 @@ medibit Pharmacy Team
             """
 
             # Send WhatsApp message
-            url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
+            url = (
+                f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
+            )
             from_number = "whatsapp:+14155238886"  # Twilio WhatsApp sandbox
             to_number = f"whatsapp:{supplier_info['phone']}"
 

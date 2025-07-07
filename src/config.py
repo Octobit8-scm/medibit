@@ -13,7 +13,11 @@ log_file = os.path.join(log_dir, "medibit_app.log")
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    handlers=[RotatingFileHandler(log_file, maxBytes=2 * 1024 * 1024, backupCount=5)],
+    handlers=[
+        RotatingFileHandler(
+            log_file, maxBytes=2 * 1024 * 1024, backupCount=5
+        )
+    ],
 )
 config_logger = logging.getLogger("medibit.config")
 

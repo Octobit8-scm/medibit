@@ -1,7 +1,5 @@
 import json
 import os
-from datetime import datetime
-
 import requests
 
 
@@ -71,7 +69,9 @@ class CloudStorage:
 
             with open(pdf_path, "rb") as f:
                 files = {"file": f}
-                response = requests.post(self.config["upload_url"], files=files)
+                response = requests.post(
+                    self.config["upload_url"], files=files
+                )
 
             if response.status_code == 200:
                 result = response.json()
@@ -81,7 +81,10 @@ class CloudStorage:
                 else:
                     return None, "Upload response doesn't contain file URL"
             else:
-                return None, f"Upload failed with status {response.status_code}"
+                return (
+                    None,
+                    f"Upload failed with status {response.status_code}",
+                )
         except Exception as e:
             return None, f"Custom upload failed: {str(e)}"
 

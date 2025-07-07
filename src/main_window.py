@@ -104,7 +104,11 @@ log_file = _os.path.join(log_dir, "medibit_app.log")
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    handlers=[RotatingFileHandler(log_file, maxBytes=2 * 1024 * 1024, backupCount=5)],
+    handlers=[
+        RotatingFileHandler(
+            log_file, maxBytes=2 * 1024 * 1024, backupCount=5
+        )
+    ],
 )
 logger = logging.getLogger("medibit")
 
@@ -118,7 +122,8 @@ class MainWindow(QMainWindow):
         try:
             import os
 
-            # Try to use the existing ICO file first (preferred for Windows taskbar)
+            # Try to use the existing ICO file first (preferred for Windows
+            # taskbar)
             if os.path.exists("medibit.ico"):
                 self.setWindowIcon(QIcon("medibit.ico"))
             else:
@@ -163,10 +168,14 @@ class MainWindow(QMainWindow):
         # Menu
         menu_menu = QMenu("Menu", self)
         # Add module access actions
-        module_names = ["Inventory", "Billing", "Orders", "Alerts", "Sales", "Settings"]
+        module_names = [
+            "Inventory", "Billing", "Orders", "Alerts", "Sales", "Settings"
+        ]
         for idx, name in enumerate(module_names):
             action = QAction(name, self)
-            action.triggered.connect(lambda checked, i=idx: self.display_page(i))
+            action.triggered.connect(
+                lambda checked, i=idx: self.display_page(i)
+            )
             menu_menu.addAction(action)
         # Add Exit action
         exit_action = QAction("Exit", self)
@@ -178,7 +187,9 @@ class MainWindow(QMainWindow):
         view_menu = QMenu("View", self)
         light_action = QAction("Light Mode", self)
         dark_action = QAction("Dark Mode", self)
-        light_action.triggered.connect(lambda: self.set_theme_from_menu("light"))
+        light_action.triggered.connect(
+            lambda: self.set_theme_from_menu("light")
+        )
         dark_action.triggered.connect(lambda: self.set_theme_from_menu("dark"))
         view_menu.addAction(light_action)
         view_menu.addAction(dark_action)
@@ -284,7 +295,9 @@ class MainWindow(QMainWindow):
         # Header
         header_layout = QHBoxLayout()
         title = QLabel("Inventory Management")
-        title.setStyleSheet("font-size: 22px; font-weight: bold; margin-right: 24px;")
+        title.setStyleSheet(
+            "font-size: 22px; font-weight: bold; margin-right: 24px;"
+        )
         header_layout.addWidget(title)
         header_layout.addStretch()
 
@@ -297,7 +310,9 @@ class MainWindow(QMainWindow):
             "Search by name, barcode, or manufacturer..."
         )
         self.inventory_search_box.setFixedWidth(250)
-        self.inventory_search_box.textChanged.connect(self.filter_inventory_table)
+        self.inventory_search_box.textChanged.connect(
+            self.filter_inventory_table
+        )
         header_layout.addWidget(self.inventory_search_box)
 
         # Inventory action buttons
@@ -338,7 +353,9 @@ class MainWindow(QMainWindow):
         self.inventory_table.cellDoubleClicked.connect(
             self.on_inventory_cell_double_clicked
         )
-        self.inventory_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.inventory_table.setSizePolicy(
+            QSizePolicy.Expanding, QSizePolicy.Expanding
+        )
         layout.addWidget(self.inventory_table, stretch=1)
 
         # Inline inventory panel area
@@ -372,7 +389,9 @@ class MainWindow(QMainWindow):
         # Header
         header_layout = QHBoxLayout()
         title = QLabel("Billing")
-        title.setStyleSheet("font-size: 22px; font-weight: bold; margin-right: 24px;")
+        title.setStyleSheet(
+            "font-size: 22px; font-weight: bold; margin-right: 24px;"
+        )
         header_layout.addWidget(title)
         header_layout.addStretch()
         for btn in [
@@ -393,10 +412,14 @@ class MainWindow(QMainWindow):
         self.billing_table.setHorizontalHeaderLabels(
             ["Barcode", "Name", "Quantity", "Price", "Total"]
         )
-        self.billing_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.billing_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Stretch
+        )
         self.billing_table.setAlternatingRowColors(True)
         self.billing_table.itemChanged.connect(self._on_billing_table_item_changed)
-        self.billing_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.billing_table.setSizePolicy(
+            QSizePolicy.Expanding, QSizePolicy.Expanding
+        )
         layout.addWidget(self.billing_table)
 
         # Info and summary layout
@@ -410,7 +433,9 @@ class MainWindow(QMainWindow):
         customer_group = QGroupBox("Customer Information")
         customer_group.setMinimumWidth(350)
         customer_group.setStyleSheet(
-            "QGroupBox { padding: 12px 16px 12px 16px; margin-top: 8px; } QGroupBox::title { subcontrol-origin: margin; left: 12px; padding: 0 8px 0 8px; }"
+            "QGroupBox { padding: 12px 16px 12px 16px; margin-top: 8px; } "
+            "QGroupBox::title { subcontrol-origin: margin; left: 12px; "
+            "padding: 0 8px 0 8px; }"
         )
         customer_layout = QFormLayout(customer_group)
         customer_layout.setContentsMargins(8, 8, 8, 8)
@@ -427,7 +452,9 @@ class MainWindow(QMainWindow):
         total_group.setMinimumWidth(220)
         total_group.setMaximumWidth(260)
         total_group.setStyleSheet(
-            "QGroupBox { padding: 12px 16px 12px 16px; margin-top: 8px; } QGroupBox::title { subcontrol-origin: margin; left: 12px; padding: 0 8px 0 8px; }"
+            "QGroupBox { padding: 12px 16px 12px 16px; margin-top: 8px; } "
+            "QGroupBox::title { subcontrol-origin: margin; left: 12px; "
+            "padding: 0 8px 0 8px; }"
         )
         total_layout = QVBoxLayout(total_group)
         total_layout.setContentsMargins(8, 8, 8, 8)
@@ -442,7 +469,9 @@ class MainWindow(QMainWindow):
         # Right: Recent Bills
         history_group = QGroupBox("Recent Bills")
         history_group.setStyleSheet(
-            "QGroupBox { padding: 12px 16px 12px 16px; margin-top: 8px; } QGroupBox::title { subcontrol-origin: margin; left: 12px; padding: 0 8px 0 8px; }"
+            "QGroupBox { padding: 12px 16px 12px 16px; margin-top: 8px; } "
+            "QGroupBox::title { subcontrol-origin: margin; left: 12px; "
+            "padding: 0 8px 0 8px; }"
         )
         history_layout = QVBoxLayout(history_group)
         history_layout.setContentsMargins(8, 8, 8, 8)
@@ -464,7 +493,9 @@ class MainWindow(QMainWindow):
         # Header
         header_layout = QHBoxLayout()
         title = QLabel("Orders Management")
-        title.setStyleSheet("font-size: 22px; font-weight: bold; margin-right: 24px;")
+        title.setStyleSheet(
+            "font-size: 22px; font-weight: bold; margin-right: 24px;"
+        )
         header_layout.addWidget(title)
         header_layout.addStretch()
         create_order_btn = QPushButton("Create Order")
@@ -478,9 +509,13 @@ class MainWindow(QMainWindow):
         self.orders_table.setHorizontalHeaderLabels(
             ["Order ID", "Date", "Supplier", "Items", "Total", "Status"]
         )
-        self.orders_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.orders_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Stretch
+        )
         self.orders_table.setAlternatingRowColors(True)
-        self.orders_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.orders_table.setSizePolicy(
+            QSizePolicy.Expanding, QSizePolicy.Expanding
+        )
         layout.addWidget(self.orders_table)
         self.refresh_orders_table()
         self.stacked_widget.addWidget(page)
@@ -493,7 +528,9 @@ class MainWindow(QMainWindow):
         # Header
         header_layout = QHBoxLayout()
         title = QLabel("Low Stock Alerts")
-        title.setStyleSheet("font-size: 22px; font-weight: bold; margin-right: 24px;")
+        title.setStyleSheet(
+            "font-size: 22px; font-weight: bold; margin-right: 24px;"
+        )
         header_layout.addWidget(title)
         header_layout.addStretch()
         send_alerts_btn = QPushButton("Send Alerts")
@@ -507,9 +544,13 @@ class MainWindow(QMainWindow):
         self.alerts_table.setHorizontalHeaderLabels(
             ["Medicine", "Current Stock", "Threshold", "Status", "Action"]
         )
-        self.alerts_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.alerts_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Stretch
+        )
         self.alerts_table.setAlternatingRowColors(True)
-        self.alerts_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.alerts_table.setSizePolicy(
+            QSizePolicy.Expanding, QSizePolicy.Expanding
+        )
         layout.addWidget(self.alerts_table)
         self.refresh_alerts_table()
         self.stacked_widget.addWidget(page)
@@ -522,7 +563,9 @@ class MainWindow(QMainWindow):
         # Header
         header_layout = QHBoxLayout()
         title = QLabel("Sales Reports")
-        title.setStyleSheet("font-size: 22px; font-weight: bold; margin-right: 24px;")
+        title.setStyleSheet(
+            "font-size: 22px; font-weight: bold; margin-right: 24px;"
+        )
         header_layout.addWidget(title)
         header_layout.addStretch()
         export_btn = QPushButton("Export CSV")
@@ -536,9 +579,13 @@ class MainWindow(QMainWindow):
         self.sales_table.setHorizontalHeaderLabels(
             ["Month", "Total Sales", "Number of Bills", "Average Bill"]
         )
-        self.sales_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.sales_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.Stretch
+        )
         self.sales_table.setAlternatingRowColors(True)
-        self.sales_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.sales_table.setSizePolicy(
+            QSizePolicy.Expanding, QSizePolicy.Expanding
+        )
         layout.addWidget(self.sales_table)
         self._refresh_monthly_sales()
         self.stacked_widget.addWidget(page)
@@ -561,7 +608,9 @@ class MainWindow(QMainWindow):
         button_layout.addWidget(notification_btn)
         pharmacy_btn = QPushButton("Pharmacy Details")
         pharmacy_btn.setMinimumHeight(50)
-        pharmacy_btn.clicked.connect(lambda: self.show_settings_panel("pharmacy"))
+        pharmacy_btn.clicked.connect(
+            lambda: self.show_settings_panel("pharmacy")
+        )
         button_layout.addWidget(pharmacy_btn)
         button_layout.addStretch()
         layout.addWidget(button_panel, 0)
