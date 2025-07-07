@@ -1,4 +1,4 @@
-from db import add_order, get_all_orders
+from src.db import add_order, get_all_orders
 
 def test_add_order():
     add_order("2024-01-01 12:00", "order_test.pdf", [

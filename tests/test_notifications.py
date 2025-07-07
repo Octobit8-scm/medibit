@@ -1,4 +1,4 @@
-from notifications import NotificationManager
+from src.notifications import NotificationManager
 
 def test_notification_config_load_and_save():
     notif = NotificationManager()

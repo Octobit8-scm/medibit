@@ -1,4 +1,4 @@
-from db import add_bill, get_all_bills
+from src.db import add_bill, get_all_bills
 
 def test_add_bill():
     add_bill("2024-01-01 10:00", 500, [

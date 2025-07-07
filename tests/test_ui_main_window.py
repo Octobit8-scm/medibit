@@ -1,6 +1,6 @@
 import pytest
 from PyQt5.QtWidgets import QApplication
-from main_window import MainWindow
+from src.main_window import MainWindow
 
 def test_main_window_launch(qtbot):
     app = QApplication.instance() or QApplication([])
