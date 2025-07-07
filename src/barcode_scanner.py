@@ -1,13 +1,14 @@
-import sys
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QMessageBox
-from PyQt5.QtCore import QTimer, Qt
-from PyQt5.QtGui import QImage, QPixmap
-from PyQt5.QtCore import QSize
-import cv2
-from pyzbar.pyzbar import decode
 import logging
-from logging.handlers import RotatingFileHandler
 import os as _os
+import sys
+from logging.handlers import RotatingFileHandler
+
+import cv2
+from PyQt5.QtCore import QSize, Qt, QTimer
+from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtWidgets import (QDialog, QLabel, QMessageBox, QPushButton,
+                             QVBoxLayout)
+from pyzbar.pyzbar import decode
 
 log_dir = _os.path.join(_os.getcwd(), 'logs')
 if not _os.path.exists(log_dir):

@@ -1,4 +1,5 @@
-from src.db import save_pharmacy_details, get_pharmacy_details
+from src.db import get_pharmacy_details, save_pharmacy_details
+
 
 def test_save_and_get_pharmacy_details():
     name = "Test Pharmacy"

@@ -1,12 +1,17 @@
-from PyQt5.QtWidgets import (QDialog, QFormLayout, QLineEdit, QSpinBox, QDateEdit, 
-                             QMessageBox, QDialogButtonBox, QVBoxLayout, QHBoxLayout, 
-                             QLabel, QCheckBox, QGroupBox, QTextEdit, QTableWidget, 
-                             QTableWidgetItem, QPushButton, QWidget, QHeaderView, QSizePolicy)
-from PyQt5.QtCore import Qt, QDate
+from PyQt5.QtCore import QDate, Qt
 from PyQt5.QtGui import QColor
-from db import get_medicine_by_barcode, update_medicine_threshold, update_medicine, update_medicine_quantity, get_pharmacy_details, save_pharmacy_details, get_all_medicines
-from notifications import NotificationManager
+from PyQt5.QtWidgets import (QCheckBox, QDateEdit, QDialog, QDialogButtonBox,
+                             QFormLayout, QGroupBox, QHBoxLayout, QHeaderView,
+                             QLabel, QLineEdit, QMessageBox, QPushButton,
+                             QSizePolicy, QSpinBox, QTableWidget,
+                             QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget)
+
 from config import get_threshold
+from db import (get_all_medicines, get_medicine_by_barcode,
+                get_pharmacy_details, save_pharmacy_details, update_medicine,
+                update_medicine_quantity, update_medicine_threshold)
+from notifications import NotificationManager
+
 
 class AddMedicineDialog(QDialog):
     def __init__(self, parent=None, barcode=None):

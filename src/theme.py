@@ -1,5 +1,6 @@
 from config import get_theme
 
+
 def get_stylesheet():
     """Get the appropriate stylesheet based on current theme"""
     theme = get_theme()

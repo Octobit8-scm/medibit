@@ -1,6 +1,7 @@
-from PyQt5.QtWidgets import QSplashScreen
-from PyQt5.QtGui import QPixmap, QPainter, QFont, QPen, QColor
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QColor, QFont, QPainter, QPen, QPixmap
+from PyQt5.QtWidgets import QSplashScreen
+
 
 class MedibitSplashScreen(QSplashScreen):
     def __init__(self):

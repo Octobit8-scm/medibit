@@ -1,9 +1,11 @@
-from PyQt5.QtWidgets import QApplication
 import sys
-from splash_screen import MedibitSplashScreen
-from main_window import MainWindow
-from db import init_db  # Import init_db
+
 from PyQt5.QtCore import QTimer
+from PyQt5.QtWidgets import QApplication
+
+from db import init_db  # Import init_db
+from main_window import MainWindow
+from splash_screen import MedibitSplashScreen
 
 if __name__ == "__main__":
     init_db()  # Initialize the database
@@ -11,9 +13,10 @@ if __name__ == "__main__":
     
     # Set the application icon to use the medibit logo
     try:
-        from PyQt5.QtGui import QIcon
         import os
-        
+
+        from PyQt5.QtGui import QIcon
+
         # Try to use the existing ICO file first (preferred for Windows taskbar)
         if os.path.exists("medibit.ico"):
             app_icon = QIcon("medibit.ico")
@@ -21,8 +24,8 @@ if __name__ == "__main__":
             app.setWindowIcon(app_icon)
         else:
             # Fallback to JPG if ICO doesn't exist
-            from PyQt5.QtGui import QPixmap
             from PyQt5.QtCore import Qt
+            from PyQt5.QtGui import QPixmap
             icon_pixmap = QPixmap("medibit.ico")
             if not icon_pixmap.isNull():
                 # Scale the icon to a reasonable size for taskbar (32x32 pixels)

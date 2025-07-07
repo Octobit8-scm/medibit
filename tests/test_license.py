@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta
+
 import license_utils
+
 
 def test_license_key_generation_and_validation():
     customer = "Test User"

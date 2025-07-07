@@ -1,5 +1,6 @@
 from src.notifications import NotificationManager
 
+
 def test_send_email_alert_disabled():
     notif = NotificationManager()
     notif.update_config("email", "enabled", False)

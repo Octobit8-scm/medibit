@@ -1,12 +1,13 @@
-import smtplib
-import requests
 import json
-import os
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from datetime import datetime
 import logging
+import os
+import smtplib
+from datetime import datetime
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from logging.handlers import RotatingFileHandler
+
+import requests
 
 log_dir = os.path.join(os.getcwd(), 'logs')
 if not os.path.exists(log_dir):

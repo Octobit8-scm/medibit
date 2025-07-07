@@ -1,41 +1,50 @@
-from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
-                             QLabel, QTableWidget, QTableWidgetItem, QListWidget, 
-                             QListWidgetItem, QStackedWidget, QStatusBar, QDialog, 
-                             QFormLayout, QLineEdit, QSpinBox, QDateEdit, QMessageBox, 
-                             QDialogButtonBox, QComboBox, QMenuBar, QMenu, QAction, 
-                             QSizePolicy, QScrollArea, QListView, QCheckBox, QGroupBox, 
-                             QTextEdit, QHeaderView, QFileDialog, QFrame, QApplication)
-from PyQt5.QtGui import QIcon, QPalette, QColor, QPixmap, QPainter, QFont, QPen
-from PyQt5.QtCore import Qt, QSize, QDate, QTimer
-import qtawesome as qta
-from db import (get_all_medicines, add_medicine, update_medicine, update_medicine_quantity, 
-                get_low_stock_medicines, add_order, get_all_orders, add_bill, get_all_bills, 
-                get_monthly_sales, get_pharmacy_details, save_pharmacy_details, delete_medicine, clear_inventory)
-from barcode_scanner import BarcodeScannerDialog
-from config import (get_threshold, set_threshold, get_theme, set_theme,
-                   get_license_key, set_license_key, get_installation_date, set_installation_date)
-from notifications import NotificationManager
-from theme import get_stylesheet
-from dialogs import (AddMedicineDialog, OrderQuantityDialog, NotificationSettingsDialog,
-                     CustomerInfoDialog, SupplierInfoDialog, ThresholdSettingDialog,
-                     BulkThresholdDialog, EditMedicineDialog, PharmacyDetailsDialog,
-                     QuickAddStockDialog, BillingAddMedicineDialog)
 import csv
 import datetime
+import json
+import logging
+# Setup logging
 import os
+import os as _os
 import subprocess
 import sys
 import tempfile
 import webbrowser
-from receipt_manager import ReceiptManager
-from order_manager import OrderManager
-import logging
 from logging.handlers import RotatingFileHandler
-import json
-from license_utils import verify_license_key
 
-# Setup logging
-import os as _os
+import qtawesome as qta
+from PyQt5.QtCore import QDate, QSize, Qt, QTimer
+from PyQt5.QtGui import QColor, QFont, QIcon, QPainter, QPalette, QPen, QPixmap
+from PyQt5.QtWidgets import (QAction, QApplication, QCheckBox, QComboBox,
+                             QDateEdit, QDialog, QDialogButtonBox, QFileDialog,
+                             QFormLayout, QFrame, QGroupBox, QHBoxLayout,
+                             QHeaderView, QLabel, QLineEdit, QListView,
+                             QListWidget, QListWidgetItem, QMainWindow, QMenu,
+                             QMenuBar, QMessageBox, QPushButton, QScrollArea,
+                             QSizePolicy, QSpinBox, QStackedWidget, QStatusBar,
+                             QTableWidget, QTableWidgetItem, QTextEdit,
+                             QVBoxLayout, QWidget)
+
+from barcode_scanner import BarcodeScannerDialog
+from config import (get_installation_date, get_license_key, get_theme,
+                    get_threshold, set_installation_date, set_license_key,
+                    set_theme, set_threshold)
+from db import (add_bill, add_medicine, add_order, clear_inventory,
+                delete_medicine, get_all_bills, get_all_medicines,
+                get_all_orders, get_low_stock_medicines, get_monthly_sales,
+                get_pharmacy_details, save_pharmacy_details, update_medicine,
+                update_medicine_quantity)
+from dialogs import (AddMedicineDialog, BillingAddMedicineDialog,
+                     BulkThresholdDialog, CustomerInfoDialog,
+                     EditMedicineDialog, NotificationSettingsDialog,
+                     OrderQuantityDialog, PharmacyDetailsDialog,
+                     QuickAddStockDialog, SupplierInfoDialog,
+                     ThresholdSettingDialog)
+from license_utils import verify_license_key
+from notifications import NotificationManager
+from order_manager import OrderManager
+from receipt_manager import ReceiptManager
+from theme import get_stylesheet
+
 log_dir = _os.path.join(_os.getcwd(), 'logs')
 if not _os.path.exists(log_dir):
     _os.makedirs(log_dir)
@@ -55,6 +64,7 @@ class MainWindow(QMainWindow):
         # Set the window icon to use the medibit logo
         try:
             import os
+
             # Try to use the existing ICO file first (preferred for Windows taskbar)
             if os.path.exists("medibit.ico"):
                 self.setWindowIcon(QIcon("medibit.ico"))
@@ -491,8 +501,9 @@ class MainWindow(QMainWindow):
     def show_inventory_panel(self, panel_name):
         """Show the selected inventory panel in the inventory page, always with up-to-date inventory."""
         from PyQt5.QtWidgets import QFrame
-        from dialogs import BulkThresholdDialog, QuickAddStockDialog
+
         from db import get_all_medicines
+        from dialogs import BulkThresholdDialog, QuickAddStockDialog
         panel_frame = self.inventory_panel.parentWidget()
         if panel_name == "threshold":
             medicines = get_all_medicines()
@@ -1289,7 +1300,8 @@ Thank you for your purchase!
         QMessageBox.information(self, "Settings Discarded", "Settings changes have been discarded.")
 
     def show_license_info_dialog(self):
-        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QMessageBox
+        from PyQt5.QtWidgets import (QDialog, QLabel, QMessageBox, QPushButton,
+                                     QVBoxLayout)
         key = get_license_key()
         if not key:
             QMessageBox.warning(self, "No License", "No license key found.")
@@ -1379,8 +1391,10 @@ Thank you for your purchase!
 
     @staticmethod
     def prompt_license_dialog(parent=None):
-        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox, QHBoxLayout
         import sys
+
+        from PyQt5.QtWidgets import (QDialog, QHBoxLayout, QLabel, QLineEdit,
+                                     QMessageBox, QPushButton, QVBoxLayout)
         while True:
             dialog = QDialog(parent)
             dialog.setWindowTitle("License Key Required")
@@ -1456,13 +1470,14 @@ Thank you for your purchase!
                 QMessageBox.critical(self, "Error", f"Failed to clear inventory: {result}") 
 
     def send_daily_sales_summary(self):
+        import datetime
+
         from db import Bill
         from notifications import NotificationManager
-        import datetime
         session = None
         try:
-            from sqlalchemy.orm import sessionmaker
             from sqlalchemy import create_engine
+            from sqlalchemy.orm import sessionmaker
             engine = create_engine(f'sqlite:///pharmacy_inventory.db', echo=False)
             Session = sessionmaker(bind=engine)
             session = Session()

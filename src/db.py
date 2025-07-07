@@ -1,12 +1,14 @@
-from sqlalchemy import create_engine, Column, Integer, String, Date, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
-import os
-from sqlalchemy.exc import IntegrityError
-from config import get_threshold
 import datetime
 import logging
+import os
 from logging.handlers import RotatingFileHandler
+
+from sqlalchemy import Column, Date, ForeignKey, Integer, String, create_engine
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship, sessionmaker
+
+from config import get_threshold
 
 Base = declarative_base()
 
@@ -308,8 +310,8 @@ def get_monthly_sales():
     try:
         # Get all bills, sorted by timestamp
         bills = session.query(Bill).order_by(Bill.timestamp).all()
-        from collections import defaultdict
         import calendar
+        from collections import defaultdict
         monthly = defaultdict(lambda: {'total': 0, 'count': 0})
         for bill in bills:
             # Parse the bill's timestamp to get year and month

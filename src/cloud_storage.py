@@ -1,7 +1,9 @@
-import os
-import requests
 import json
+import os
 from datetime import datetime
+
+import requests
+
 
 class CloudStorage:
     """Simple cloud storage for PDF receipts using free services"""
