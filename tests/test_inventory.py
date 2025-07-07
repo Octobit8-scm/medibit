@@ -1,7 +1,6 @@
 import pytest
 
-from src.db import (add_medicine, clear_inventory, delete_medicine,
-                    get_all_medicines)
+from src.db import add_medicine, clear_inventory, delete_medicine, get_all_medicines
 
 
 def test_add_and_delete_medicine():
@@ -13,8 +12,9 @@ def test_add_and_delete_medicine():
     meds = get_all_medicines()
     assert not any(m.barcode == barcode for m in meds)
 
+
 def test_clear_inventory():
     add_medicine("TEST456", "TestMed2", 5, None, "TestManu2", 50, 2)
     clear_inventory()
     meds = get_all_medicines()
-    assert len(meds) == 0 
+    assert len(meds) == 0

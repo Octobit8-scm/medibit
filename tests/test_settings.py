@@ -18,4 +18,4 @@ def test_save_and_get_pharmacy_details():
     assert details.email == email
     assert details.gst_number == gst
     assert details.license_number == lic
-    assert details.website == website 
+    assert details.website == website

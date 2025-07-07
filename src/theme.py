@@ -4,11 +4,12 @@ from config import get_theme
 def get_stylesheet():
     """Get the appropriate stylesheet based on current theme"""
     theme = get_theme()
-    
-    if theme == 'dark':
+
+    if theme == "dark":
         return get_dark_stylesheet()
     else:
         return get_light_stylesheet()
+
 
 def get_dark_stylesheet():
     """Dark theme stylesheet: white text, black/white icons only"""
@@ -69,6 +70,7 @@ def get_dark_stylesheet():
     /* Remove all accent and non-white text colors */
     """
 
+
 def get_light_stylesheet():
     """Light theme stylesheet: black text, black/white icons only"""
     return """
@@ -126,4 +128,4 @@ def get_light_stylesheet():
         color: #000000;
     }
     /* Remove all accent and non-black text colors */
-    """ 
+    """

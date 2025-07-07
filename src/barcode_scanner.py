@@ -6,20 +6,20 @@ from logging.handlers import RotatingFileHandler
 import cv2
 from PyQt5.QtCore import QSize, Qt, QTimer
 from PyQt5.QtGui import QImage, QPixmap
-from PyQt5.QtWidgets import (QDialog, QLabel, QMessageBox, QPushButton,
-                             QVBoxLayout)
+from PyQt5.QtWidgets import QDialog, QLabel, QMessageBox, QPushButton, QVBoxLayout
 from pyzbar.pyzbar import decode
 
-log_dir = _os.path.join(_os.getcwd(), 'logs')
+log_dir = _os.path.join(_os.getcwd(), "logs")
 if not _os.path.exists(log_dir):
     _os.makedirs(log_dir)
-log_file = _os.path.join(log_dir, 'medibit_app.log')
+log_file = _os.path.join(log_dir, "medibit_app.log")
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s %(levelname)s %(name)s: %(message)s',
-    handlers=[RotatingFileHandler(log_file, maxBytes=2*1024*1024, backupCount=5)]
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    handlers=[RotatingFileHandler(log_file, maxBytes=2 * 1024 * 1024, backupCount=5)],
 )
-barcode_logger = logging.getLogger('medibit.barcode')
+barcode_logger = logging.getLogger("medibit.barcode")
+
 
 class BarcodeScannerDialog(QDialog):
     def __init__(self, parent=None):
@@ -64,7 +64,7 @@ class BarcodeScannerDialog(QDialog):
             (x, y, w, h) = barcode.rect
             cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 3)
         if barcodes:
-            self.barcode = barcodes[0].data.decode('utf-8')
+            self.barcode = barcodes[0].data.decode("utf-8")
             self.timer.stop()
             self.timeout_timer.stop()
             self.capture.release()
@@ -74,13 +74,19 @@ class BarcodeScannerDialog(QDialog):
         h, w, ch = rgb_image.shape
         bytes_per_line = ch * w
         qt_image = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format_RGB888)
-        self.label.setPixmap(QPixmap.fromImage(qt_image).scaled(600, 400, Qt.KeepAspectRatio))
+        self.label.setPixmap(
+            QPixmap.fromImage(qt_image).scaled(600, 400, Qt.KeepAspectRatio)
+        )
 
     def handle_timeout(self):
         self.timer.stop()
         if self.capture.isOpened():
             self.capture.release()
-        QMessageBox.information(self, "No Barcode Detected", "No barcode was detected after 10 seconds. Please try again.")
+        QMessageBox.information(
+            self,
+            "No Barcode Detected",
+            "No barcode was detected after 10 seconds. Please try again.",
+        )
         self.reject()
 
     def get_barcode(self):
@@ -91,4 +97,4 @@ class BarcodeScannerDialog(QDialog):
         self.timeout_timer.stop()
         if self.capture.isOpened():
             self.capture.release()
-        event.accept() 
+        event.accept()

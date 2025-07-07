@@ -9,4 +9,4 @@ def test_main_window_launch(qtbot):
     window = MainWindow()
     qtbot.addWidget(window)
     window.show()
-    assert window.isVisible() 
+    assert window.isVisible()

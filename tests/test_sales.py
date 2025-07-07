@@ -9,4 +9,4 @@ def test_get_monthly_sales():
         assert isinstance(month, str)
         assert isinstance(total, (int, float))
         assert isinstance(count, int)
-        assert isinstance(avg, (int, float)) 
+        assert isinstance(avg, (int, float))

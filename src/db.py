@@ -12,19 +12,20 @@ from config import get_threshold
 
 Base = declarative_base()
 
-log_dir = os.path.join(os.getcwd(), 'logs')
+log_dir = os.path.join(os.getcwd(), "logs")
 if not os.path.exists(log_dir):
     os.makedirs(log_dir)
-log_file = os.path.join(log_dir, 'medibit_app.log')
+log_file = os.path.join(log_dir, "medibit_app.log")
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s %(levelname)s %(name)s: %(message)s',
-    handlers=[RotatingFileHandler(log_file, maxBytes=2*1024*1024, backupCount=5)]
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    handlers=[RotatingFileHandler(log_file, maxBytes=2 * 1024 * 1024, backupCount=5)],
 )
-db_logger = logging.getLogger('medibit.db')
+db_logger = logging.getLogger("medibit.db")
+
 
 class Medicine(Base):
-    __tablename__ = 'medicines'
+    __tablename__ = "medicines"
     id = Column(Integer, primary_key=True)
     barcode = Column(String, unique=True, nullable=False)
     name = Column(String, nullable=False)
@@ -34,46 +35,51 @@ class Medicine(Base):
     price = Column(Integer, default=0)
     threshold = Column(Integer, default=10)  # Individual stock threshold
 
+
 class Order(Base):
-    __tablename__ = 'orders'
+    __tablename__ = "orders"
     id = Column(Integer, primary_key=True)
     timestamp = Column(String, nullable=False)
     file_path = Column(String, nullable=False)
-    medicines = relationship('OrderMedicine', back_populates='order')
+    medicines = relationship("OrderMedicine", back_populates="order")
+
 
 class OrderMedicine(Base):
-    __tablename__ = 'order_medicines'
+    __tablename__ = "order_medicines"
     id = Column(Integer, primary_key=True)
-    order_id = Column(Integer, ForeignKey('orders.id'))
+    order_id = Column(Integer, ForeignKey("orders.id"))
     barcode = Column(String, nullable=False)
     name = Column(String, nullable=False)
     quantity = Column(Integer, nullable=False)
     expiry = Column(String)
     manufacturer = Column(String)
     order_quantity = Column(Integer, nullable=True)
-    order = relationship('Order', back_populates='medicines')
+    order = relationship("Order", back_populates="medicines")
+
 
 class Bill(Base):
-    __tablename__ = 'bills'
+    __tablename__ = "bills"
     id = Column(Integer, primary_key=True)
     timestamp = Column(String, nullable=False)
     total = Column(Integer, nullable=False)
     file_path = Column(String, nullable=True)
-    items = relationship('BillItem', back_populates='bill')
+    items = relationship("BillItem", back_populates="bill")
+
 
 class BillItem(Base):
-    __tablename__ = 'bill_items'
+    __tablename__ = "bill_items"
     id = Column(Integer, primary_key=True)
-    bill_id = Column(Integer, ForeignKey('bills.id'))
+    bill_id = Column(Integer, ForeignKey("bills.id"))
     barcode = Column(String, nullable=False)
     name = Column(String, nullable=False)
     price = Column(Integer, nullable=False)
     quantity = Column(Integer, nullable=False)
     subtotal = Column(Integer, nullable=False)
-    bill = relationship('Bill', back_populates='items')
+    bill = relationship("Bill", back_populates="items")
+
 
 class PharmacyDetails(Base):
-    __tablename__ = 'pharmacy_details'
+    __tablename__ = "pharmacy_details"
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
     address = Column(String, nullable=False)
@@ -83,12 +89,14 @@ class PharmacyDetails(Base):
     license_number = Column(String, nullable=True)
     website = Column(String, nullable=True)
 
-DB_FILENAME = 'pharmacy_inventory.db'
-DB_URL = f'sqlite:///{DB_FILENAME}'
+
+DB_FILENAME = "pharmacy_inventory.db"
+DB_URL = f"sqlite:///{DB_FILENAME}"
 engine = create_engine(DB_URL, echo=False)
 Session = sessionmaker(bind=engine)
 
 LOW_STOCK_THRESHOLD = 10
+
 
 def init_db():
     if not os.path.exists(DB_FILENAME):
@@ -104,11 +112,16 @@ def init_db():
             # Threshold column doesn't exist, add it
             print("Adding threshold column to existing medicines...")
             from sqlalchemy import text
+
             with engine.connect() as conn:
-                conn.execute(text("ALTER TABLE medicines ADD COLUMN threshold INTEGER DEFAULT 10"))
+                conn.execute(
+                    text(
+                        "ALTER TABLE medicines ADD COLUMN threshold INTEGER DEFAULT 10"
+                    )
+                )
                 conn.commit()
             print("Threshold column added successfully!")
-        
+
         # Check if pharmacy_details table exists, if not create it
         try:
             session = Session()
@@ -126,9 +139,10 @@ def init_db():
                 # Try creating all tables
                 Base.metadata.create_all(engine)
                 print("All tables created successfully!")
-        
+
         # Create default pharmacy details if none exist
         create_default_pharmacy_details()
+
 
 def get_all_medicines():
     session = Session()
@@ -136,11 +150,13 @@ def get_all_medicines():
     session.close()
     return medicines
 
+
 def get_medicine_by_barcode(barcode):
     session = Session()
     medicine = session.query(Medicine).filter_by(barcode=barcode).first()
     session.close()
     return medicine
+
 
 def update_medicine_threshold(barcode, threshold):
     session = Session()
@@ -157,6 +173,7 @@ def update_medicine_threshold(barcode, threshold):
         return False, str(e)
     finally:
         session.close()
+
 
 def update_medicine(barcode, name, quantity, expiry, manufacturer, price, threshold):
     session = Session()
@@ -179,6 +196,7 @@ def update_medicine(barcode, name, quantity, expiry, manufacturer, price, thresh
     finally:
         session.close()
 
+
 def update_medicine_quantity(barcode, new_quantity):
     session = Session()
     try:
@@ -195,12 +213,13 @@ def update_medicine_quantity(barcode, new_quantity):
     finally:
         session.close()
 
+
 def add_medicine(barcode, name, quantity, expiry, manufacturer, price=0, threshold=10):
     session = Session()
     try:
         # Check if medicine with this barcode already exists
         existing_medicine = session.query(Medicine).filter_by(barcode=barcode).first()
-        
+
         if existing_medicine:
             # Update existing medicine
             existing_medicine.name = name
@@ -210,14 +229,25 @@ def add_medicine(barcode, name, quantity, expiry, manufacturer, price=0, thresho
             existing_medicine.price = price
             existing_medicine.threshold = threshold
             session.commit()
-            return True, f"Updated existing medicine '{name}' and added {quantity} units"
+            return (
+                True,
+                f"Updated existing medicine '{name}' and added {quantity} units",
+            )
         else:
             # Create new medicine
-            med = Medicine(barcode=barcode, name=name, quantity=quantity, expiry=expiry, manufacturer=manufacturer, price=price, threshold=threshold)
+            med = Medicine(
+                barcode=barcode,
+                name=name,
+                quantity=quantity,
+                expiry=expiry,
+                manufacturer=manufacturer,
+                price=price,
+                threshold=threshold,
+            )
             session.add(med)
             session.commit()
             return True, f"Added new medicine '{name}'"
-            
+
     except IntegrityError as e:
         session.rollback()
         return False, str(e)
@@ -227,12 +257,16 @@ def add_medicine(barcode, name, quantity, expiry, manufacturer, price=0, thresho
     finally:
         session.close()
 
+
 def get_low_stock_medicines():
     session = Session()
     # Use individual thresholds instead of global threshold
-    medicines = session.query(Medicine).filter(Medicine.quantity < Medicine.threshold).all()
+    medicines = (
+        session.query(Medicine).filter(Medicine.quantity < Medicine.threshold).all()
+    )
     session.close()
     return medicines
+
 
 def add_order(timestamp, file_path, medicines):
     session = Session()
@@ -242,19 +276,21 @@ def add_order(timestamp, file_path, medicines):
     for med in medicines:
         # Support both dict and ORM object
         if isinstance(med, dict):
-            barcode = med.get('barcode')
-            name = med.get('name')
-            quantity = med.get('quantity')
-            expiry = str(med.get('expiry')) if med.get('expiry') else ""
-            manufacturer = med.get('manufacturer') or ""
-            order_quantity = med.get('order_quantity', None)
+            barcode = med.get("barcode")
+            name = med.get("name")
+            quantity = med.get("quantity")
+            expiry = str(med.get("expiry")) if med.get("expiry") else ""
+            manufacturer = med.get("manufacturer") or ""
+            order_quantity = med.get("order_quantity", None)
         else:
-            barcode = getattr(med, 'barcode', None)
-            name = getattr(med, 'name', None)
-            quantity = getattr(med, 'quantity', None)
-            expiry = str(getattr(med, 'expiry', "")) if getattr(med, 'expiry', None) else ""
-            manufacturer = getattr(med, 'manufacturer', "") or ""
-            order_quantity = getattr(med, 'order_quantity', None)
+            barcode = getattr(med, "barcode", None)
+            name = getattr(med, "name", None)
+            quantity = getattr(med, "quantity", None)
+            expiry = (
+                str(getattr(med, "expiry", "")) if getattr(med, "expiry", None) else ""
+            )
+            manufacturer = getattr(med, "manufacturer", "") or ""
+            order_quantity = getattr(med, "order_quantity", None)
         order_med = OrderMedicine(
             order_id=order.id,
             barcode=barcode,
@@ -262,12 +298,13 @@ def add_order(timestamp, file_path, medicines):
             quantity=quantity,
             expiry=expiry,
             manufacturer=manufacturer,
-            order_quantity=order_quantity
+            order_quantity=order_quantity,
         )
         session.add(order_med)
     session.commit()
     session.close()
     # NOTE: If you get a DB error about missing 'order_quantity', delete pharmacy_inventory.db and restart the app to recreate the DB.
+
 
 def get_all_orders():
     session = Session()
@@ -278,6 +315,7 @@ def get_all_orders():
     session.close()
     return orders
 
+
 def add_bill(timestamp, total, items, file_path=None):
     session = Session()
     bill = Bill(timestamp=timestamp, total=total, file_path=file_path)
@@ -286,15 +324,16 @@ def add_bill(timestamp, total, items, file_path=None):
     for item in items:
         bill_item = BillItem(
             bill_id=bill.id,
-            barcode=item['barcode'],
-            name=item['name'],
-            price=item['price'],
-            quantity=item['quantity'],
-            subtotal=item['subtotal']
+            barcode=item["barcode"],
+            name=item["name"],
+            price=item["price"],
+            quantity=item["quantity"],
+            subtotal=item["subtotal"],
         )
         session.add(bill_item)
     session.commit()
     session.close()
+
 
 def get_all_bills():
     session = Session()
@@ -304,6 +343,7 @@ def get_all_bills():
     session.close()
     return bills
 
+
 def get_monthly_sales():
     """Return a list of (Month, Total Sales, Bill Count, Average Bill) for each month with sales."""
     session = Session()
@@ -312,27 +352,29 @@ def get_monthly_sales():
         bills = session.query(Bill).order_by(Bill.timestamp).all()
         import calendar
         from collections import defaultdict
-        monthly = defaultdict(lambda: {'total': 0, 'count': 0})
+
+        monthly = defaultdict(lambda: {"total": 0, "count": 0})
         for bill in bills:
             # Parse the bill's timestamp to get year and month
             try:
-                dt = datetime.datetime.strptime(bill.timestamp[:10], '%Y-%m-%d')
+                dt = datetime.datetime.strptime(bill.timestamp[:10], "%Y-%m-%d")
             except Exception:
                 continue
             key = (dt.year, dt.month)
-            monthly[key]['total'] += bill.total
-            monthly[key]['count'] += 1
+            monthly[key]["total"] += bill.total
+            monthly[key]["count"] += 1
         # Prepare result: list of (Month, Total Sales, Bill Count, Average Bill)
         result = []
         for (year, month), data in sorted(monthly.items()):
             month_name = f"{calendar.month_name[month]} {year}"
-            total = data['total']
-            count = data['count']
+            total = data["total"]
+            count = data["count"]
             avg = total / count if count else 0
             result.append((month_name, total, count, avg))
         return result
     finally:
         session.close()
+
 
 def get_pharmacy_details():
     session = Session()
@@ -346,7 +388,10 @@ def get_pharmacy_details():
         session.close()
         return None
 
-def save_pharmacy_details(name, address, phone, email, gst_number="", license_number="", website=""):
+
+def save_pharmacy_details(
+    name, address, phone, email, gst_number="", license_number="", website=""
+):
     session = Session()
     try:
         # Check if pharmacy details already exist
@@ -370,11 +415,11 @@ def save_pharmacy_details(name, address, phone, email, gst_number="", license_nu
                 email=email,
                 gst_number=gst_number,
                 license_number=license_number,
-                website=website
+                website=website,
             )
             session.add(details)
             print(f"Created new pharmacy details: {details.name}")
-        
+
         session.commit()
         return True, "Pharmacy details saved successfully"
     except Exception as e:
@@ -383,6 +428,7 @@ def save_pharmacy_details(name, address, phone, email, gst_number="", license_nu
         return False, str(e)
     finally:
         session.close()
+
 
 def create_default_pharmacy_details():
     """Create default pharmacy details if none exist"""
@@ -397,7 +443,7 @@ def create_default_pharmacy_details():
                 email="info@medibitpharmacy.com",
                 gst_number="",
                 license_number="",
-                website="www.medibitpharmacy.com"
+                website="www.medibitpharmacy.com",
             )
             session.add(default_details)
             session.commit()
@@ -410,6 +456,7 @@ def create_default_pharmacy_details():
         return False
     finally:
         session.close()
+
 
 def delete_medicine(barcode):
     """Delete a single medicine from the inventory by barcode."""
@@ -428,6 +475,7 @@ def delete_medicine(barcode):
     finally:
         session.close()
 
+
 def clear_inventory():
     """Delete all medicines from the inventory."""
     session = Session()
@@ -439,4 +487,4 @@ def clear_inventory():
         session.rollback()
         return False, str(e)
     finally:
-        session.close() 
+        session.close()
