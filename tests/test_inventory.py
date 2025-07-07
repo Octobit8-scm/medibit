@@ -1,5 +1,5 @@
 import pytest
-from src.db import add_medicine, get_all_medicines, delete_medicine, clear_inventory
+from db import add_medicine, get_all_medicines, delete_medicine, clear_inventory
 
 def test_add_and_delete_medicine():
     barcode = "TEST123"
