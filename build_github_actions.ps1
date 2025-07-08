@@ -41,15 +41,50 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "=== Step 3: Add additional binaries if they exist ===" -ForegroundColor Green
-# Add additional binaries if they exist
-$pyzbarPath = "venv\Lib\site-packages\pyzbar"
-if (Test-Path "$pyzbarPath\libiconv.dll") {
-  Copy-Item "$pyzbarPath\libiconv.dll" "dist\"
-  Write-Host "Copied libiconv.dll" -ForegroundColor Yellow
+# Add additional binaries if they exist - try multiple possible paths
+$pyzbarPaths = @(
+  "venv\Lib\site-packages\pyzbar",
+  "venv\Lib\site-packages\pyzbar-0.1.9-py3.11.egg\pyzbar",
+  "venv\Lib\site-packages\pyzbar-0.1.9-py3.11.egg\pyzbar\lib",
+  "venv\Lib\site-packages\pyzbar\lib",
+  "venv\Lib\site-packages\pyzbar\*.dll"
+)
+
+$dllsFound = $false
+foreach ($pyzbarPath in $pyzbarPaths) {
+  if (Test-Path "$pyzbarPath\libiconv.dll") {
+    Copy-Item "$pyzbarPath\libiconv.dll" "dist\"
+    Write-Host "Copied libiconv.dll from $pyzbarPath" -ForegroundColor Yellow
+    $dllsFound = $true
+  }
+  if (Test-Path "$pyzbarPath\libzbar-64.dll") {
+    Copy-Item "$pyzbarPath\libzbar-64.dll" "dist\"
+    Write-Host "Copied libzbar-64.dll from $pyzbarPath" -ForegroundColor Yellow
+    $dllsFound = $true
+  }
 }
-if (Test-Path "$pyzbarPath\libzbar-64.dll") {
-  Copy-Item "$pyzbarPath\libzbar-64.dll" "dist\"
-  Write-Host "Copied libzbar-64.dll" -ForegroundColor Yellow
+
+# Also try to find DLLs in the current directory or Python installation
+if (-not $dllsFound) {
+  Write-Host "Searching for pyzbar DLLs in alternative locations..." -ForegroundColor Yellow
+  $pythonPath = python -c "import sys; print(sys.prefix)" 2>$null
+  if ($pythonPath) {
+    $altPaths = @(
+      "$pythonPath\Lib\site-packages\pyzbar",
+      "$pythonPath\DLLs",
+      "C:\Windows\System32"
+    )
+    foreach ($altPath in $altPaths) {
+      if (Test-Path "$altPath\libiconv.dll") {
+        Copy-Item "$altPath\libiconv.dll" "dist\"
+        Write-Host "Copied libiconv.dll from $altPath" -ForegroundColor Yellow
+      }
+      if (Test-Path "$altPath\libzbar-64.dll") {
+        Copy-Item "$altPath\libzbar-64.dll" "dist\"
+        Write-Host "Copied libzbar-64.dll from $altPath" -ForegroundColor Yellow
+      }
+    }
+  }
 }
 
 Write-Host "=== Step 4: Create distribution package ===" -ForegroundColor Green
@@ -59,26 +94,38 @@ $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $zipName = "MedibitPharmacy-v$version-$timestamp.zip"
 
 # Copy additional files to dist
-if (Test-Path "config.json") {
-  Copy-Item "config.json" "dist\"
-  Write-Host "Copied config.json" -ForegroundColor Yellow
+$filesToCopy = @(
+  "config.json",
+  "pharmacy_inventory.db",
+  "README.txt",
+  "RELEASE_NOTES.txt",
+  "license.txt"
+)
+
+foreach ($file in $filesToCopy) {
+  if (Test-Path $file) {
+    Copy-Item $file "dist\"
+    Write-Host "Copied $file" -ForegroundColor Yellow
+  }
+  else {
+    Write-Host "File not found: $file" -ForegroundColor Red
+  }
 }
-if (Test-Path "pharmacy_inventory.db") {
-  Copy-Item "pharmacy_inventory.db" "dist\"
-  Write-Host "Copied pharmacy_inventory.db" -ForegroundColor Yellow
-}
-if (Test-Path "README.txt") {
-  Copy-Item "README.txt" "dist\"
-  Write-Host "Copied README.txt" -ForegroundColor Yellow
-}
-if (Test-Path "RELEASE_NOTES.txt") {
-  Copy-Item "RELEASE_NOTES.txt" "dist\"
-  Write-Host "Copied RELEASE_NOTES.txt" -ForegroundColor Yellow
-}
+
+# List what's in the dist directory before creating zip
+Write-Host "Files in dist directory:" -ForegroundColor Cyan
+Get-ChildItem "dist\" | ForEach-Object { Write-Host "  - $($_.Name)" -ForegroundColor White }
 
 # Create zip archive
 Compress-Archive -Path "dist\*" -DestinationPath $zipName -Force
 Write-Host "Created distribution package: $zipName" -ForegroundColor Green
+
+# List contents of the zip file
+Write-Host "Contents of zip file:" -ForegroundColor Cyan
+$zipContents = Get-ChildItem $zipName | ForEach-Object { 
+  [System.IO.Compression.ZipFile]::OpenRead($_.FullName).Entries | Select-Object Name 
+}
+$zipContents | ForEach-Object { Write-Host "  - $($_.Name)" -ForegroundColor White }
 
 Write-Host ""
 Write-Host "Build completed successfully!" -ForegroundColor Green
