@@ -1,0 +1,99 @@
+name: Build and Test Medibit Pharmacy
+
+on:
+  push:
+    branches:
+      - master
+      - development
+  pull_request:
+    branches:
+      - master
+      - development
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller pytest pytest-qt pytest-cov flake8 black isort
+
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=${{ github.workspace }}/src" >> $GITHUB_ENV
+
+      - name: Debug Python Path
+        run: python -c "import sys; print(sys.path)"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Cache PyInstaller build
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/
+            dist/
+          key: ${{ runner.os }}-pyinstaller-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-pyinstaller-
+
+      - name: Cache Inno Setup
+        uses: actions/cache@v4
+        with:
+          path: C:\ProgramData\chocolatey\lib\innosetup
+          key: ${{ runner.os }}-innosetup
+
+      - name: Debug Path
+        run: |
+          echo "PWD: $PWD"
+          echo "PYTHONPATH: $env:PYTHONPATH"
+          dir
+          dir tests
+
+      # - name: Static Analysis - isort
+      #   run: isort --check --diff src/ tests/
+
+      # - name: Static Analysis - black
+      #   run: black --check src/ tests/
+
+      # - name: Static Analysis - flake8
+      #   run: flake8 src/ tests/
+
+      - name: Run Tests with Coverage
+        shell: pwsh
+        run: |
+          $env:PYTHONPATH="src"
+          python -m pytest --cov=src --cov-report=xml --cov-report=term tests/ --disable-warnings -v
+
+      - name: Build EXE and Distribution Package
+        shell: pwsh
+        run: |
+          .\build_github_actions.ps1
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            dist/
+            build/
+            *.log
+            RELEASE_NOTES.txt
+            README.txt

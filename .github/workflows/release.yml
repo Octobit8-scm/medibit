@@ -4,6 +4,11 @@ on:
   push:
     tags:
       - "v*" # Only run on version tags like v1.0.0
+  workflow_dispatch:
+    inputs:
+      release_name:
+        description: "Release name (optional)"
+        required: false
 
 jobs:
   build:
@@ -22,19 +27,86 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pyinstaller pytest pytest-qt
+          pip install pyinstaller pytest pytest-qt pytest-cov flake8 black isort
 
       - name: Install Inno Setup
         run: |
           choco install innosetup --no-progress
 
-      - name: Run Tests
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=${{ github.workspace }}/src" >> $GITHUB_ENV
+
+      - name: Debug Python Path
+        run: python -c "import sys; print(sys.path)"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Cache PyInstaller build
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/
+            dist/
+          key: ${{ runner.os }}-pyinstaller-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-pyinstaller-
+
+      - name: Cache Inno Setup
+        uses: actions/cache@v4
+        with:
+          path: C:\ProgramData\chocolatey\lib\innosetup
+          key: ${{ runner.os }}-innosetup
+
+      - name: Debug Path
         run: |
-          pytest tests/ --disable-warnings -v
+          echo "PWD: $PWD"
+          echo "PYTHONPATH: $env:PYTHONPATH"
+          dir
+          dir tests
+
+      - name: Static Analysis - isort
+        run: isort --check --diff src/ tests/
+
+      - name: Static Analysis - black
+        run: black --check src/ tests/
+
+      - name: Static Analysis - flake8
+        run: flake8 src/ tests/
+
+      - name: Run Tests with Coverage
+        shell: pwsh
+        run: |
+          .\venv\Scripts\activate
+          $env:PYTHONPATH="src"
+          python -m pytest --cov=src --cov-report=xml --cov-report=term tests/ --disable-warnings -v
 
       - name: Build EXE and Installer
         run: |
           ./build_installer.bat
+
+      - name: Automated Versioning
+        id: version
+        uses: PaulHatch/semantic-version@v5.4.0
+        with:
+          tag_prefix: "v"
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            dist/
+            build/
+            *.log
+            RELEASE_NOTES.txt
+            README.txt
 
       - name: Upload Installer Artifact
         uses: actions/upload-artifact@v4
@@ -43,8 +115,10 @@ jobs:
           path: dist/MedibitPharmacySetup.exe
 
       - name: Create GitHub Release
+        if: github.ref_type == 'tag' || github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
           files: dist/MedibitPharmacySetup.exe
+          name: ${{ github.event.inputs.release_name || github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

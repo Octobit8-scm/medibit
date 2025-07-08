@@ -1,20 +1,35 @@
-from db import save_pharmacy_details, get_pharmacy_details
+from src.db import get_pharmacy_details, save_pharmacy_details
+
 
 def test_save_and_get_pharmacy_details():
-    name = "Test Pharmacy"
-    address = "123 Test St"
-    phone = "+1234567890"
-    email = "test@pharmacy.com"
-    gst = "GST123"
-    lic = "LIC123"
-    website = "www.testpharmacy.com"
-    success, msg = save_pharmacy_details(name, address, phone, email, gst, lic, website)
+    # Test data
+    test_name = "Test Pharmacy"
+    test_address = "123 Test Street"
+    test_phone = "+1234567890"
+    test_email = "test@pharmacy.com"
+    test_gst = "GST123456"
+    test_license = "LIC123456"
+    test_website = "www.testpharmacy.com"
+
+    # Save pharmacy details
+    success, message = save_pharmacy_details(
+        test_name,
+        test_address,
+        test_phone,
+        test_email,
+        test_gst,
+        test_license,
+        test_website,
+    )
     assert success
+
+    # Get pharmacy details
     details = get_pharmacy_details()
-    assert details.name == name
-    assert details.address == address
-    assert details.phone == phone
-    assert details.email == email
-    assert details.gst_number == gst
-    assert details.license_number == lic
-    assert details.website == website 
+    assert details is not None
+    assert details.name == test_name
+    assert details.address == test_address
+    assert details.phone == test_phone
+    assert details.email == test_email
+    assert details.gst_number == test_gst
+    assert details.license_number == test_license
+    assert details.website == test_website
