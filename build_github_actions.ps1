@@ -96,7 +96,7 @@ $zipName = "MedibitPharmacy-v$version-$timestamp.zip"
 # Copy additional files to dist
 $filesToCopy = @(
   "config.json",
-  "pharmacy_inventory.db",
+  "notification_config.json",
   "README.txt",
   "RELEASE_NOTES.txt",
   "license.txt"
