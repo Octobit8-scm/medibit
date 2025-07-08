@@ -13,7 +13,13 @@ def test_save_and_get_pharmacy_details():
 
     # Save pharmacy details
     success, message = save_pharmacy_details(
-        test_name, test_address, test_phone, test_email, test_gst, test_license, test_website
+        test_name,
+        test_address,
+        test_phone,
+        test_email,
+        test_gst,
+        test_license,
+        test_website,
     )
     assert success
 

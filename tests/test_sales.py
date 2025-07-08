@@ -16,6 +16,6 @@ def test_get_monthly_sales():
             }
         ],
     )
-    
+
     sales = get_monthly_sales()
     assert len(sales) > 0

@@ -1,5 +1,5 @@
-# Build and Installer Script for Medibit Pharmacy
-# PowerShell version for GitHub Actions compatibility
+# Build Script for GitHub Actions
+# Creates EXE and zip archive instead of installer
 
 Write-Host "=== Step 1: Clean previous build ===" -ForegroundColor Green
 # Clean previous build
@@ -52,29 +52,35 @@ if (Test-Path "$pyzbarPath\libzbar-64.dll") {
   Write-Host "Copied libzbar-64.dll" -ForegroundColor Yellow
 }
 
-Write-Host "=== Step 4: Build installer with Inno Setup ===" -ForegroundColor Green
-# Build installer with Inno Setup
-$innoSetupPath = "C:\Program Files (x86)\Inno Setup 6\iscc.exe"
-if (Test-Path $innoSetupPath) {
-  Write-Host "Found Inno Setup at: $innoSetupPath" -ForegroundColor Yellow
-  $result = & $innoSetupPath "installer.iss"
-  if ($LASTEXITCODE -ne 0) {
-    Write-Host "Inno Setup build failed!" -ForegroundColor Red
-    Write-Host "Continuing without installer creation..." -ForegroundColor Yellow
-  }
-  else {
-    Write-Host "Inno Setup build completed successfully!" -ForegroundColor Green
-  }
+Write-Host "=== Step 4: Create distribution package ===" -ForegroundColor Green
+# Create a zip archive for distribution
+$version = "1.0.0"
+$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$zipName = "MedibitPharmacy-v$version-$timestamp.zip"
+
+# Copy additional files to dist
+if (Test-Path "config.json") {
+  Copy-Item "config.json" "dist\"
+  Write-Host "Copied config.json" -ForegroundColor Yellow
 }
-else {
-  Write-Host "Inno Setup not found at: $innoSetupPath" -ForegroundColor Yellow
-  Write-Host "Skipping installer creation..." -ForegroundColor Yellow
-  Write-Host "The executable is available at: dist\main.exe" -ForegroundColor Cyan
+if (Test-Path "pharmacy_inventory.db") {
+  Copy-Item "pharmacy_inventory.db" "dist\"
+  Write-Host "Copied pharmacy_inventory.db" -ForegroundColor Yellow
 }
+if (Test-Path "README.txt") {
+  Copy-Item "README.txt" "dist\"
+  Write-Host "Copied README.txt" -ForegroundColor Yellow
+}
+if (Test-Path "RELEASE_NOTES.txt") {
+  Copy-Item "RELEASE_NOTES.txt" "dist\"
+  Write-Host "Copied RELEASE_NOTES.txt" -ForegroundColor Yellow
+}
+
+# Create zip archive
+Compress-Archive -Path "dist\*" -DestinationPath $zipName -Force
+Write-Host "Created distribution package: $zipName" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "Build completed successfully!" -ForegroundColor Green
 Write-Host "Executable: dist\main.exe" -ForegroundColor Cyan
-if (Test-Path "dist\MedibitPharmacySetup.exe") {
-  Write-Host "Installer: dist\MedibitPharmacySetup.exe" -ForegroundColor Cyan
-} 
+Write-Host "Distribution package: $zipName" -ForegroundColor Cyan 
