@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 SECRET_KEY = b"medibit-2024-very-secret-key"  # Use a strong, private key in production
 
 
-def generate_license_key(customer_name, expiry_date):
+def generate_license_key(customer_name: str, expiry_date: str) -> str:
     """
     Generate a license key for a customer.
     :param customer_name: str, e.g. 'John Doe'
@@ -23,7 +23,7 @@ def generate_license_key(customer_name, expiry_date):
     return f"{data_b64}.{sig_b64}"
 
 
-def verify_license_key(license_key):
+def verify_license_key(license_key: str) -> tuple[bool, dict or None, str or None]:
     """
     Verify a license key and return (valid, data, error_message)
     :param license_key: str
@@ -54,7 +54,5 @@ if __name__ == "__main__":
     name = "John Doe"
     expiry = (datetime.now() + timedelta(days=365)).strftime("%Y-%m-%d")
     key = generate_license_key(name, expiry)
-    print("Generated license key:", key)
     # Example: verify
     valid, data, err = verify_license_key(key)
-    print("Valid:", valid, "Data:", data, "Error:", err)

@@ -8,7 +8,7 @@ from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtWidgets import QDialog, QLabel, QMessageBox, QPushButton, QVBoxLayout
 from pyzbar.pyzbar import decode
 
-log_dir = _os.path.join(_os.getcwd(), "logs")
+log_dir = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "logs")
 if not _os.path.exists(log_dir):
     _os.makedirs(log_dir)
 log_file = _os.path.join(log_dir, "medibit_app.log")
@@ -57,11 +57,6 @@ class BarcodeScannerDialog(QDialog):
             self.label.setText("Failed to access camera.")
             return
         barcodes = decode(frame)
-        print(f"[DEBUG] Barcodes detected in frame: {len(barcodes)}")
-        # Draw rectangles around detected barcodes
-        for barcode in barcodes:
-            (x, y, w, h) = barcode.rect
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 3)
         if barcodes:
             self.barcode = barcodes[0].data.decode("utf-8")
             self.timer.stop()

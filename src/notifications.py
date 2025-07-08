@@ -9,7 +9,7 @@ from logging.handlers import RotatingFileHandler
 
 import requests
 
-log_dir = os.path.join(os.getcwd(), "logs")
+log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
 if not os.path.exists(log_dir):
     os.makedirs(log_dir)
 log_file = os.path.join(log_dir, "medibit_app.log")
@@ -23,7 +23,11 @@ notif_logger = logging.getLogger("medibit.notifications")
 
 class NotificationManager:
     def __init__(self):
-        self.config_file = "notification_config.json"
+        # Set config directory at project root
+        config_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config")
+        if not os.path.exists(config_dir):
+            os.makedirs(config_dir)
+        self.config_file = os.path.join(config_dir, "notification_config.json")
         self.load_config()
 
     def load_config(self):
@@ -32,7 +36,11 @@ class NotificationManager:
             try:
                 with open(self.config_file, "r") as f:
                     self.config = json.load(f)
-            except:
+            except json.JSONDecodeError as e:
+                notif_logger.error(f"Failed to decode notification config JSON: {e}")
+                self.create_default_config()
+            except Exception as e:
+                notif_logger.error(f"Failed to read notification config: {e}")
                 self.create_default_config()
         else:
             self.create_default_config()
@@ -55,8 +63,11 @@ class NotificationManager:
 
     def save_config(self):
         """Save configuration to file"""
-        with open(self.config_file, "w") as f:
-            json.dump(self.config, f, indent=4)
+        try:
+            with open(self.config_file, "w") as f:
+                json.dump(self.config, f, indent=4)
+        except Exception as e:
+            notif_logger.error(f"Failed to save notification config: {e}")
 
     def send_email_alert(self, low_stock_medicines):
         """Send email alert for low stock medicines"""
@@ -171,11 +182,9 @@ class NotificationManager:
 
                     if response.status_code in [200, 201]:
                         success_count += 1
-                    else:
-                        print(f"WhatsApp API error for {phone}: {response.text}")
 
                 except Exception as e:
-                    print(f"WhatsApp alert failed for {phone}: {str(e)}")
+                    pass
 
             if success_count > 0:
                 return True, f"WhatsApp alert sent to {success_count} recipients"
@@ -233,26 +242,9 @@ class NotificationManager:
 
                     if response.status_code in [200, 201]:
                         success_count += 1
-                    else:
-                        error_msg = response.text
-                        print(f"SMS API error for {phone}: {error_msg}")
-
-                        # Provide specific guidance for common errors
-                        if "21408" in error_msg:
-                            print(
-                                f"  → Solution: Verify {phone} in Twilio Console → Phone Numbers → Verified Caller IDs"
-                            )
-                        elif "21211" in error_msg:
-                            print(
-                                f"  → Solution: Check phone number format for {phone}"
-                            )
-                        elif "21214" in error_msg:
-                            print(
-                                f"  → Solution: Check Twilio phone number in notifications.py"
-                            )
 
                 except Exception as e:
-                    print(f"SMS alert failed for {phone}: {str(e)}")
+                    pass
 
             if success_count > 0:
                 return True, f"SMS alert sent to {success_count} recipients"
@@ -363,10 +355,8 @@ class NotificationManager:
                     )
                     if response.status_code in [200, 201]:
                         success_count += 1
-                    else:
-                        print(f"WhatsApp API error for {phone}: {response.text}")
                 except Exception as e:
-                    print(f"WhatsApp daily sales failed for {phone}: {str(e)}")
+                    pass
             if success_count > 0:
                 return (
                     True,

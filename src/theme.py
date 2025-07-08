@@ -1,7 +1,7 @@
 from config import get_theme
 
 
-def get_stylesheet():
+def get_stylesheet() -> str:
     """Get the appropriate stylesheet based on current theme"""
     theme = get_theme()
 
@@ -11,12 +11,35 @@ def get_stylesheet():
         return get_light_stylesheet()
 
 
-def get_dark_stylesheet():
-    """Dark theme stylesheet: white text, black/white icons only"""
+def get_dark_stylesheet() -> str:
+    """Dark theme stylesheet: white text, black/white icons only, no table highlight or borders"""
     return """
     QMainWindow, QWidget {
         background-color: #2B2B2B;
         color: #FFFFFF;
+    }
+    QFrame {
+        background-color: transparent;
+        border: 1px solid #444444;
+        border-radius: 6px;
+    }
+    QTableWidget, QListWidget, QTreeWidget {
+        background-color: transparent;
+        color: #FFFFFF;
+        border: none;
+        selection-background-color: #2B2B2B;
+        selection-color: #FFFFFF;
+    }
+    QTableWidget::item {
+        background-color: transparent;
+        border: none;
+        selection-background-color: #2B2B2B;
+        selection-color: #FFFFFF;
+    }
+    QListWidget::item {
+        background-color: transparent;
+        color: #FFFFFF;
+        border: none;
     }
     QDialog, QMessageBox {
         background-color: #2B2B2B;
@@ -38,9 +61,18 @@ def get_dark_stylesheet():
         background-color: #2B2B2B;
         color: #FFFFFF;
     }
-    QPushButton, QLineEdit, QTextEdit, QComboBox, QSpinBox, QDateEdit, QTableWidget, QListWidget, QTreeWidget, QHeaderView::section, QLabel, QStatusBar, QTabBar::tab, QTabWidget::pane, QGroupBox, QGroupBox::title, QCheckBox {
+    QPushButton, QLabel, QStatusBar, QTabBar::tab, QTabWidget::pane, QGroupBox, QGroupBox::title, QCheckBox {
         color: #FFFFFF;
         background-color: transparent;
+    }
+    QLineEdit, QSpinBox, QComboBox, QTextEdit, QDateEdit {
+        color: #FFFFFF;
+        background-color: transparent;
+        border: 1px solid #888;
+        border-radius: 4px;
+        padding: 4px 8px;
+        selection-background-color: #2B2B2B;
+        selection-color: #FFFFFF;
     }
     QPushButton {
         background-color: #404040;
@@ -53,13 +85,10 @@ def get_dark_stylesheet():
     QPushButton:disabled {
         color: #808080;
     }
-    QTableWidget, QListWidget, QTreeWidget {
-        background-color: #2B2B2B;
-        color: #FFFFFF;
-    }
     QHeaderView::section {
         background-color: #404040;
         color: #FFFFFF;
+        border: none;
     }
     QLabel {
         color: #FFFFFF;
@@ -71,12 +100,30 @@ def get_dark_stylesheet():
     """
 
 
-def get_light_stylesheet():
+def get_light_stylesheet() -> str:
     """Light theme stylesheet: black text, black/white icons only"""
     return """
     QMainWindow, QWidget {
         background-color: #FFFFFF;
         color: #000000;
+    }
+    QFrame {
+        background-color: transparent;
+        border: 1px solid #CCCCCC;
+        border-radius: 6px;
+    }
+    QTableWidget, QListWidget, QTreeWidget {
+        background-color: transparent;
+        color: #000000;
+    }
+    QTableWidget::item {
+        background-color: transparent;
+        border: none;
+    }
+    QListWidget::item {
+        background-color: transparent;
+        color: #000000;
+        border: none;
     }
     QDialog, QMessageBox {
         background-color: #FFFFFF;
@@ -98,9 +145,18 @@ def get_light_stylesheet():
         background-color: #FFFFFF;
         color: #000000;
     }
-    QPushButton, QLineEdit, QTextEdit, QComboBox, QSpinBox, QDateEdit, QTableWidget, QListWidget, QTreeWidget, QHeaderView::section, QLabel, QStatusBar, QTabBar::tab, QTabWidget::pane, QGroupBox, QGroupBox::title, QCheckBox {
+    QPushButton, QLabel, QStatusBar, QTabBar::tab, QTabWidget::pane, QGroupBox, QGroupBox::title, QCheckBox {
         color: #000000;
         background-color: transparent;
+    }
+    QLineEdit, QSpinBox, QComboBox, QTextEdit, QDateEdit {
+        color: #000000;
+        background-color: transparent;
+        border: 1px solid #B3B3B3;
+        border-radius: 4px;
+        padding: 4px 8px;
+        selection-background-color: #FFFFFF;
+        selection-color: #000000;
     }
     QPushButton {
         background-color: #FFFFFF;
@@ -112,10 +168,6 @@ def get_light_stylesheet():
     }
     QPushButton:disabled {
         color: #666666;
-    }
-    QTableWidget, QListWidget, QTreeWidget {
-        background-color: #FFFFFF;
-        color: #000000;
     }
     QHeaderView::section {
         background-color: #FFFFFF;

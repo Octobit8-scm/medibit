@@ -39,4 +39,16 @@ Publisher
 Octobit8
 https://octobit8.com
 
-© 2024 Octobit8. All rights reserved. 
+© 2024 Octobit8. All rights reserved.
+
+## Running Tests
+
+To ensure all Python bytecode cache files (__pycache__) are created in the project root (not inside src), set the following environment variable before running tests:
+
+```powershell
+$env:PYTHONPYCACHEPREFIX = (Get-Location).Path + "\__pycache__"
+$env:PYTHONPATH = "src"
+python -m pytest tests/ --disable-warnings -v
+```
+
+This will keep your project directories clean and ensure all .pyc files are stored in the root __pycache__ folder. 

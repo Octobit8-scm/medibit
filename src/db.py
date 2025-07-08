@@ -12,7 +12,7 @@ from config import get_threshold
 
 Base = declarative_base()
 
-log_dir = os.path.join(os.getcwd(), "logs")
+log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
 if not os.path.exists(log_dir):
     os.makedirs(log_dir)
 log_file = os.path.join(log_dir, "medibit_app.log")
@@ -90,7 +90,11 @@ class PharmacyDetails(Base):
     website = Column(String, nullable=True)
 
 
-DB_FILENAME = "pharmacy_inventory.db"
+# Set database directory at project root
+DATABASE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "database")
+if not os.path.exists(DATABASE_DIR):
+    os.makedirs(DATABASE_DIR)
+DB_FILENAME = os.path.join(DATABASE_DIR, "pharmacy_inventory.db")
 DB_URL = f"sqlite:///{DB_FILENAME}"
 engine = create_engine(DB_URL, echo=False)
 Session = sessionmaker(bind=engine)
@@ -98,7 +102,11 @@ Session = sessionmaker(bind=engine)
 LOW_STOCK_THRESHOLD = 10
 
 
-def init_db():
+def init_db() -> None:
+    """
+    Initialize the database and create tables if they do not exist.
+    Handles schema migrations for threshold and pharmacy_details.
+    """
     if not os.path.exists(DB_FILENAME):
         Base.metadata.create_all(engine)
     else:
@@ -145,21 +153,37 @@ def init_db():
         create_default_pharmacy_details()
 
 
-def get_all_medicines():
+def get_all_medicines() -> list:
+    """
+    Retrieve all medicines from the inventory.
+    :return: List of Medicine objects
+    """
     session = Session()
     medicines = session.query(Medicine).all()
+    session.expunge_all()  # Force reload of all objects
     session.close()
     return medicines
 
 
-def get_medicine_by_barcode(barcode):
+def get_medicine_by_barcode(barcode: str) -> 'Medicine':
+    """
+    Retrieve a medicine by its barcode.
+    :param barcode: Medicine barcode
+    :return: Medicine object or None
+    """
     session = Session()
     medicine = session.query(Medicine).filter_by(barcode=barcode).first()
     session.close()
     return medicine
 
 
-def update_medicine_threshold(barcode, threshold):
+def update_medicine_threshold(barcode: str, threshold: int) -> tuple:
+    """
+    Update the threshold value for a medicine.
+    :param barcode: Medicine barcode
+    :param threshold: New threshold value
+    :return: (success, error message)
+    """
     session = Session()
     try:
         medicine = session.query(Medicine).filter_by(barcode=barcode).first()
@@ -176,7 +200,18 @@ def update_medicine_threshold(barcode, threshold):
         session.close()
 
 
-def update_medicine(barcode, name, quantity, expiry, manufacturer, price, threshold):
+def update_medicine(barcode: str, name: str, quantity: int, expiry, manufacturer: str, price: int, threshold: int) -> tuple:
+    """
+    Update all fields of a medicine by barcode.
+    :param barcode: Medicine barcode
+    :param name: Medicine name
+    :param quantity: Quantity in stock
+    :param expiry: Expiry date
+    :param manufacturer: Manufacturer name
+    :param price: Price per unit
+    :param threshold: Stock threshold
+    :return: (success, error message)
+    """
     session = Session()
     try:
         medicine = session.query(Medicine).filter_by(barcode=barcode).first()
@@ -198,7 +233,13 @@ def update_medicine(barcode, name, quantity, expiry, manufacturer, price, thresh
         session.close()
 
 
-def update_medicine_quantity(barcode, new_quantity):
+def update_medicine_quantity(barcode: str, new_quantity: int) -> tuple:
+    """
+    Update the quantity of a medicine by barcode.
+    :param barcode: Medicine barcode
+    :param new_quantity: New quantity value
+    :return: (success, error message)
+    """
     session = Session()
     try:
         medicine = session.query(Medicine).filter_by(barcode=barcode).first()
@@ -215,7 +256,18 @@ def update_medicine_quantity(barcode, new_quantity):
         session.close()
 
 
-def add_medicine(barcode, name, quantity, expiry, manufacturer, price=0, threshold=10):
+def add_medicine(barcode: str, name: str, quantity: int, expiry, manufacturer: str, price: int = 0, threshold: int = 10) -> tuple:
+    """
+    Add a new medicine or update an existing one by barcode.
+    :param barcode: Medicine barcode
+    :param name: Medicine name
+    :param quantity: Quantity to add
+    :param expiry: Expiry date
+    :param manufacturer: Manufacturer name
+    :param price: Price per unit
+    :param threshold: Stock threshold
+    :return: (success, message)
+    """
     session = Session()
     try:
         # Check if medicine with this barcode already exists
@@ -259,7 +311,11 @@ def add_medicine(barcode, name, quantity, expiry, manufacturer, price=0, thresho
         session.close()
 
 
-def get_low_stock_medicines():
+def get_low_stock_medicines() -> list:
+    """
+    Retrieve all medicines that are below their individual stock threshold.
+    :return: List of Medicine objects
+    """
     session = Session()
     # Use individual thresholds instead of global threshold
     medicines = (
@@ -269,7 +325,13 @@ def get_low_stock_medicines():
     return medicines
 
 
-def add_order(timestamp, file_path, medicines):
+def add_order(timestamp: str, file_path: str, medicines: list) -> None:
+    """
+    Add a new order to the database.
+    :param timestamp: Order timestamp
+    :param file_path: Path to order PDF
+    :param medicines: List of medicine dicts or objects
+    """
     session = Session()
     order = Order(timestamp=timestamp, file_path=file_path)
     session.add(order)
@@ -308,7 +370,11 @@ def add_order(timestamp, file_path, medicines):
     # delete pharmacy_inventory.db and restart the app to recreate the DB.
 
 
-def get_all_orders():
+def get_all_orders() -> list:
+    """
+    Retrieve all orders from the database.
+    :return: List of Order objects
+    """
     session = Session()
     orders = session.query(Order).order_by(Order.id.desc()).all()
     # Eager load medicines
@@ -318,7 +384,14 @@ def get_all_orders():
     return orders
 
 
-def add_bill(timestamp, total, items, file_path=None):
+def add_bill(timestamp: str, total: int, items: list, file_path: str = None) -> None:
+    """
+    Add a new bill to the database.
+    :param timestamp: Bill timestamp
+    :param total: Total bill amount
+    :param items: List of bill item dicts
+    :param file_path: Optional path to bill PDF
+    """
     session = Session()
     bill = Bill(timestamp=timestamp, total=total, file_path=file_path)
     session.add(bill)
@@ -337,7 +410,11 @@ def add_bill(timestamp, total, items, file_path=None):
     session.close()
 
 
-def get_all_bills():
+def get_all_bills() -> list:
+    """
+    Retrieve all bills from the database.
+    :return: List of Bill objects
+    """
     session = Session()
     bills = session.query(Bill).order_by(Bill.id.desc()).all()
     for bill in bills:
@@ -346,9 +423,11 @@ def get_all_bills():
     return bills
 
 
-def get_monthly_sales():
-    """Return a list of (Month, Total Sales, Bill Count, Average Bill) for each
-    month with sales."""
+def get_monthly_sales() -> list:
+    """
+    Return a list of (Month, Total Sales, Bill Count, Average Bill) for each month with sales.
+    :return: List of tuples (month_name, total, count, avg)
+    """
     session = Session()
     try:
         # Get all bills, sorted by timestamp
@@ -379,7 +458,11 @@ def get_monthly_sales():
         session.close()
 
 
-def get_pharmacy_details():
+def get_pharmacy_details() -> 'PharmacyDetails':
+    """
+    Retrieve pharmacy details from the database.
+    :return: PharmacyDetails object or None
+    """
     session = Session()
     try:
         details = session.query(PharmacyDetails).first()
@@ -393,8 +476,19 @@ def get_pharmacy_details():
 
 
 def save_pharmacy_details(
-    name, address, phone, email, gst_number="", license_number="", website=""
-):
+    name: str, address: str, phone: str, email: str, gst_number: str = "", license_number: str = "", website: str = ""
+) -> tuple:
+    """
+    Save or update pharmacy details in the database.
+    :param name: Pharmacy name
+    :param address: Address
+    :param phone: Phone number
+    :param email: Email address
+    :param gst_number: GST number (optional)
+    :param license_number: License number (optional)
+    :param website: Website (optional)
+    :return: (success, message)
+    """
     session = Session()
     try:
         # Check if pharmacy details already exist
@@ -433,8 +527,11 @@ def save_pharmacy_details(
         session.close()
 
 
-def create_default_pharmacy_details():
-    """Create default pharmacy details if none exist"""
+def create_default_pharmacy_details() -> bool:
+    """
+    Create default pharmacy details if none exist.
+    :return: True if created, False if already exists or error
+    """
     session = Session()
     try:
         existing = session.query(PharmacyDetails).first()
@@ -461,8 +558,12 @@ def create_default_pharmacy_details():
         session.close()
 
 
-def delete_medicine(barcode):
-    """Delete a single medicine from the inventory by barcode."""
+def delete_medicine(barcode: str) -> tuple:
+    """
+    Delete a single medicine from the inventory by barcode.
+    :param barcode: Medicine barcode
+    :return: (success, error message)
+    """
     session = Session()
     try:
         medicine = session.query(Medicine).filter_by(barcode=barcode).first()
@@ -479,8 +580,11 @@ def delete_medicine(barcode):
         session.close()
 
 
-def clear_inventory():
-    """Delete all medicines from the inventory."""
+def clear_inventory() -> tuple:
+    """
+    Delete all medicines from the inventory.
+    :return: (success, number deleted or error message)
+    """
     session = Session()
     try:
         num_deleted = session.query(Medicine).delete()
@@ -489,5 +593,23 @@ def clear_inventory():
     except Exception as e:
         session.rollback()
         return False, str(e)
+    finally:
+        session.close()
+
+
+def clear_all_bills() -> None:
+    """
+    Delete all bills from the database.
+    """
+    session = Session()
+    try:
+        session.query(BillItem).delete()
+        session.query(Bill).delete()
+        session.commit()
+        return True
+    except Exception as e:
+        session.rollback()
+        print(f"Error clearing all bills: {e}")
+        return False
     finally:
         session.close()
