@@ -49,35 +49,12 @@ from PyQt5.QtWidgets import (
     QTextEdit,
     QVBoxLayout,
     QWidget,
+    QGridLayout,
+    QDoubleSpinBox,
+    QInputDialog,
 )
 
 from barcode_scanner import BarcodeScannerDialog
-from config import (
-    get_installation_date,
-    get_license_key,
-    get_theme,
-    get_threshold,
-    set_installation_date,
-    set_license_key,
-    set_theme,
-    set_threshold,
-)
-from db import (
-    add_bill,
-    add_medicine,
-    add_order,
-    clear_inventory,
-    delete_medicine,
-    get_all_bills,
-    get_all_medicines,
-    get_all_orders,
-    get_low_stock_medicines,
-    get_monthly_sales,
-    get_pharmacy_details,
-    save_pharmacy_details,
-    update_medicine,
-    update_medicine_quantity,
-)
 from dialogs import (
     AddMedicineDialog,
     BillingAddMedicineDialog,
@@ -92,12 +69,26 @@ from dialogs import (
     ThresholdSettingDialog,
 )
 from license_utils import verify_license_key
-from notifications import NotificationManager
-from order_manager import OrderManager
+from order_service import OrderService
 from receipt_manager import ReceiptManager
 from theme import get_stylesheet
+from billing_ui import BillingUi
+from inventory_ui import InventoryUi
+from orders_ui import OrdersUi
+from alerts_ui import AlertsUi
+from sales_ui import SalesUi
+from settings_ui import SettingsUi
+from inventory_service import InventoryService
+from billing_service import BillingService
+from db import (
+    clear_all_bills,
+)
+from alert_service import AlertService
+from settings_service import SettingsService
+from config import get_theme
+from notifications import NotificationManager
 
-log_dir = _os.path.join(_os.getcwd(), "logs")
+log_dir = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "logs")
 if not _os.path.exists(log_dir):
     _os.makedirs(log_dir)
 log_file = _os.path.join(log_dir, "medibit_app.log")
@@ -108,9 +99,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger("medibit")
 
+# For drafts
+os.makedirs(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'drafts'), exist_ok=True)
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    """
+    Main application window for the Medibit pharmacy management system.
+    Handles UI setup, navigation, and delegates business logic to service classes.
+    """
+    def __init__(self) -> None:
+        """
+        Initialize the main window, set up UI, services, and status bar.
+        """
         super().__init__()
         logger.info("MainWindow initialized")
         self.setWindowTitle("Medibit")
@@ -147,6 +147,13 @@ class MainWindow(QMainWindow):
             NotificationManager()
         )  # Initialize notification manager
         self.receipt_manager = ReceiptManager()  # Add this line
+        self.bulk_threshold_dialog = None
+        self.quick_add_stock_dialog = None
+        self.inventory_service = InventoryService()
+        self.billing_service = BillingService()
+        self.order_service = OrderService()
+        self.alert_service = AlertService()
+        self.settings_service = SettingsService()
         self._init_menubar()
         self.setStyleSheet(get_stylesheet())
         self.init_ui()
@@ -158,7 +165,10 @@ class MainWindow(QMainWindow):
         dev_label.setStyleSheet("font-weight: bold; padding-right: 16px;")
         self.statusBar.addPermanentWidget(dev_label)
 
-    def _init_menubar(self):
+    def _init_menubar(self) -> None:
+        """
+        Initialize the menu bar with navigation, view, about, license, and reports.
+        """
         menubar = QMenuBar(self)
         self.setMenuBar(menubar)
         # Menu
@@ -205,7 +215,10 @@ class MainWindow(QMainWindow):
             reports_menu = self.menuBar().addMenu("Reports")
         reports_menu.addAction(daily_sales_action)
 
-    def init_ui(self):
+    def init_ui(self) -> None:
+        """
+        Set up the main UI layout, navigation bar, and stacked widget pages.
+        """
         # Central widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -266,333 +279,126 @@ class MainWindow(QMainWindow):
         # Set initial page
         self.display_page(0)
 
-    def update_navbar_highlight(self, index):
-        """Update navbar button highlights"""
+    def update_navbar_highlight(self, index: int) -> None:
+        """
+        Update navbar button highlights.
+        :param index: Index of the selected page
+        """
         for i, btn in enumerate(self.nav_buttons):
             btn.setChecked(i == index)
 
-    def display_page(self, index):
-        """Display the selected page"""
+    def display_page(self, index: int) -> None:
+        """
+        Display the selected page in the stacked widget.
+        :param index: Index of the page to display
+        """
         self.stacked_widget.setCurrentIndex(index)
         self.update_navbar_highlight(index)
 
-    def create_inventory_page(self):
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
+    def create_inventory_page(self) -> None:
+        """
+        Create and set up the inventory page UI and connect signals.
+        """
+        self.inventory_ui = InventoryUi(self)
+        # Connect buttons to MainWindow methods
+        self.inventory_ui.add_medicine_btn.clicked.connect(self.open_add_medicine_dialog)
+        self.inventory_ui.scan_barcode_btn.clicked.connect(self.open_barcode_scanner)
+        self.inventory_ui.generate_order_btn.clicked.connect(self.generate_order)
+        self.inventory_ui.bulk_threshold_btn.clicked.connect(lambda: self.show_inventory_panel("threshold"))
+        self.inventory_ui.quick_add_stock_btn.clicked.connect(lambda: self.show_inventory_panel("quick_add"))
+        self.inventory_ui.delete_btn.clicked.connect(self.delete_selected_inventory_row)
+        self.inventory_ui.clear_inventory_btn.clicked.connect(self.clear_inventory)
+        self.inventory_ui.inventory_search_box.textChanged.connect(self.filter_inventory_table)
+        self.inventory_ui.inventory_table.cellDoubleClicked.connect(self.on_inventory_cell_double_clicked)
+        self.stacked_widget.addWidget(self.inventory_ui)
 
-        # Header
-        header_layout = QHBoxLayout()
-        title = QLabel("Inventory Management")
-        title.setStyleSheet("font-size: 22px; font-weight: bold; margin-right: 24px;")
-        header_layout.addWidget(title)
-        header_layout.addStretch()
+    def create_billing_page(self) -> None:
+        self.billing_ui = BillingUi(self)
+        self.stacked_widget.addWidget(self.billing_ui)
 
-        # Search box
-        search_label = QLabel("Search:")
-        search_label.setStyleSheet("font-size: 16px; margin-right: 8px;")
-        header_layout.addWidget(search_label)
-        self.inventory_search_box = QLineEdit()
-        self.inventory_search_box.setPlaceholderText(
-            "Search by name, barcode, or manufacturer..."
-        )
-        self.inventory_search_box.setFixedWidth(250)
-        self.inventory_search_box.textChanged.connect(self.filter_inventory_table)
-        header_layout.addWidget(self.inventory_search_box)
+    def create_orders_page(self) -> None:
+        self.orders_ui = OrdersUi(self)
+        self.stacked_widget.addWidget(self.orders_ui)
 
-        # Inventory action buttons
-        for btn in [
-            ("Add Medicine", self.open_add_medicine_dialog),
-            ("Scan Barcode", self.open_barcode_scanner),
-            ("Generate Order", self.generate_order),
-            ("Bulk Threshold Settings", lambda: self.show_inventory_panel("threshold")),
-            ("Quick Add Stock", lambda: self.show_inventory_panel("quick_add")),
-            ("Delete", self.delete_selected_inventory_row),
-            ("Clear Inventory", self.clear_inventory),
-        ]:
-            b = QPushButton(btn[0])
-            b.setMinimumHeight(36)
-            b.clicked.connect(btn[1])
-            header_layout.addWidget(b)
+    def create_alerts_page(self) -> None:
+        self.alerts_ui = AlertsUi(self)
+        self.stacked_widget.addWidget(self.alerts_ui)
 
-        layout.addLayout(header_layout)
+    def create_sales_page(self) -> None:
+        self.sales_ui = SalesUi(self)
+        self.stacked_widget.addWidget(self.sales_ui)
 
-        # Inventory table
-        self.inventory_table = QTableWidget()
-        self.inventory_table.setColumnCount(7)
-        self.inventory_table.setHorizontalHeaderLabels(
-            [
-                "Barcode",
-                "Name",
-                "Quantity",
-                "Threshold",
-                "Expiry",
-                "Manufacturer",
-                "Price",
-            ]
-        )
-        self.inventory_table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.Stretch
-        )
-        self.inventory_table.setAlternatingRowColors(True)
-        self.inventory_table.cellDoubleClicked.connect(
-            self.on_inventory_cell_double_clicked
-        )
-        self.inventory_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        layout.addWidget(self.inventory_table, stretch=1)
+    def create_settings_page(self) -> None:
+        self.settings_ui = SettingsUi(self)
+        self.stacked_widget.addWidget(self.settings_ui)
 
-        # Inline inventory panel area
-        panel_frame = QFrame()
-        panel_frame.setFrameShape(QFrame.StyledPanel)
-        panel_frame.setFrameShadow(QFrame.Raised)
-        panel_layout = QVBoxLayout(panel_frame)
-        panel_layout.setContentsMargins(0, 0, 0, 0)
-        panel_layout.setSpacing(0)
-        self.inventory_panel = QStackedWidget()
-        panel_layout.addWidget(self.inventory_panel)
-        layout.addWidget(panel_frame)
-        from dialogs import BulkThresholdDialog, QuickAddStockDialog
+    def view_or_download_bill(self) -> None:
+        """
+        View or download the selected bill from recent bills, or resume a draft.
+        """
+        selected_items = self.billing_history_list.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, "No Bill Selected", "Please select a bill to view or download.")
+            return
+        selected_item = selected_items[0]
+        data = selected_item.data(Qt.UserRole)
+        # Resume draft if selected
+        if isinstance(data, dict) and data.get('is_draft'):
+            draft = data['draft']
+            # Restore customer info
+            self.customer_name.setText(draft['customer'].get('name', ''))
+            self.customer_age.setValue(draft['customer'].get('age', 0))
+            gender = draft['customer'].get('gender', 'Male')
+            idx = self.customer_gender.findText(gender)
+            self.customer_gender.setCurrentIndex(idx if idx != -1 else 0)
+            self.customer_phone.setText(draft['customer'].get('phone', ''))
+            self.customer_email.setText(draft['customer'].get('email', ''))
+            self.customer_address.setText(draft['customer'].get('address', ''))
+            # Restore billing table
+            self.billing_table.setRowCount(0)
+            for item in draft['items']:
+                row = self.billing_table.rowCount()
+                self.billing_table.insertRow(row)
+                for col, key in enumerate(['barcode', 'name', 'quantity', 'price', 'tax', 'discount']):
+                    self.billing_table.setItem(row, col, QTableWidgetItem(item.get(key, '')))
+                self.billing_table.setItem(row, 6, QTableWidgetItem(""))  # Total will be recalculated
+            self._refresh_billing_table()
+            QMessageBox.information(self, "Draft Loaded", "Draft bill has been loaded. You can now resume billing.")
+            return
+        # Otherwise, handle as before
+        bill = data
+        if not bill:
+            QMessageBox.warning(self, "Error", "Could not retrieve bill details.")
+            return
+        # If bill has a file_path, offer to open or save the PDF
+        if hasattr(bill, 'file_path') and bill.file_path:
+            from PyQt5.QtWidgets import QFileDialog
+            import shutil
+            save_path, _ = QFileDialog.getSaveFileName(self, "Save Bill PDF", "bill.pdf", "PDF Files (*.pdf)")
+            if save_path:
+                try:
+                    shutil.copyfile(bill.file_path, save_path)
+                    QMessageBox.information(self, "Saved", f"Bill saved to {save_path}")
+                except Exception as e:
+                    QMessageBox.warning(self, "Error", f"Could not save file: {e}")
+        else:
+            QMessageBox.information(self, "No PDF Available", "No PDF file is available for this bill.")
 
-        self.bulk_threshold_widget = BulkThresholdDialog([], parent=self)
-        self.quick_add_stock_widget = QuickAddStockDialog([], parent=self)
-        self.inventory_panel.addWidget(self.bulk_threshold_widget)
-        self.inventory_panel.addWidget(self.quick_add_stock_widget)
-        self.inventory_panel.setCurrentIndex(-1)
-        panel_frame.setVisible(False)
-        self.all_medicines = []
-        self.refresh_inventory_table()
-        self.stacked_widget.addWidget(page)
-
-    def create_billing_page(self):
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
-
-        # Header
-        header_layout = QHBoxLayout()
-        title = QLabel("Billing")
-        title.setStyleSheet("font-size: 22px; font-weight: bold; margin-right: 24px;")
-        header_layout.addWidget(title)
-        header_layout.addStretch()
-        for btn in [
-            ("Add Medicine", self.open_billing_add_medicine_dialog),
-            ("Scan Barcode", self.scan_billing_barcode),
-            ("Complete Sale", self.complete_sale),
-            ("Clear Bill", self.clear_bill),
-        ]:
-            b = QPushButton(btn[0])
-            b.setMinimumHeight(40)
-            b.clicked.connect(btn[1])
-            header_layout.addWidget(b)
-        layout.addLayout(header_layout)
-
-        # Billing table
-        self.billing_table = QTableWidget()
-        self.billing_table.setColumnCount(5)
-        self.billing_table.setHorizontalHeaderLabels(
-            ["Barcode", "Name", "Quantity", "Price", "Total"]
-        )
-        self.billing_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.billing_table.setAlternatingRowColors(True)
-        self.billing_table.itemChanged.connect(self._on_billing_table_item_changed)
-        self.billing_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        layout.addWidget(self.billing_table)
-
-        # Info and summary layout
-        info_summary_layout = QHBoxLayout()
-        info_summary_layout.setSpacing(16)
-
-        # Left: Customer info and bill summary (vertical)
-        left_vbox = QVBoxLayout()
-        left_vbox.setSpacing(12)
-        # Customer info
-        customer_group = QGroupBox("Customer Information")
-        customer_group.setMinimumWidth(350)
-        customer_group.setStyleSheet(
-            "QGroupBox { padding: 12px 16px 12px 16px; margin-top: 8px; } "
-            "QGroupBox::title { subcontrol-origin: margin; left: 12px; "
-            "padding: 0 8px 0 8px; }"
-        )
-        customer_layout = QFormLayout(customer_group)
-        customer_layout.setContentsMargins(8, 8, 8, 8)
-        customer_layout.setSpacing(10)
-        self.customer_name = QLineEdit()
-        self.customer_phone = QLineEdit()
-        self.customer_email = QLineEdit()
-        customer_layout.addRow("Name:", self.customer_name)
-        customer_layout.addRow("Phone:", self.customer_phone)
-        customer_layout.addRow("Email:", self.customer_email)
-        left_vbox.addWidget(customer_group)
-        # Bill summary below
-        total_group = QGroupBox("Bill Summary")
-        total_group.setMinimumWidth(220)
-        total_group.setMaximumWidth(260)
-        total_group.setStyleSheet(
-            "QGroupBox { padding: 12px 16px 12px 16px; margin-top: 8px; } "
-            "QGroupBox::title { subcontrol-origin: margin; left: 12px; "
-            "padding: 0 8px 0 8px; }"
-        )
-        total_layout = QVBoxLayout(total_group)
-        total_layout.setContentsMargins(8, 8, 8, 8)
-        total_layout.setSpacing(10)
-        self.total_label = QLabel("Total: ₹0.00")
-        self.total_label.setStyleSheet(self.get_bill_summary_total_stylesheet())
-        total_layout.addWidget(self.total_label)
-        left_vbox.addWidget(total_group)
-        left_vbox.addStretch()
-        info_summary_layout.addLayout(left_vbox, 2)
-
-        # Right: Recent Bills
-        history_group = QGroupBox("Recent Bills")
-        history_group.setStyleSheet(
-            "QGroupBox { padding: 12px 16px 12px 16px; margin-top: 8px; } "
-            "QGroupBox::title { subcontrol-origin: margin; left: 12px; "
-            "padding: 0 8px 0 8px; }"
-        )
-        history_layout = QVBoxLayout(history_group)
-        history_layout.setContentsMargins(8, 8, 8, 8)
-        history_layout.setSpacing(10)
-        self.billing_history_list = QListWidget()
-        history_layout.addWidget(self.billing_history_list)
-        info_summary_layout.addWidget(history_group, 1)
-
-        layout.addLayout(info_summary_layout)
-        self.billing_items = []
-        self._refresh_billing_history()
-        self.stacked_widget.addWidget(page)
-
-    def create_orders_page(self):
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
-        # Header
-        header_layout = QHBoxLayout()
-        title = QLabel("Orders Management")
-        title.setStyleSheet("font-size: 22px; font-weight: bold; margin-right: 24px;")
-        header_layout.addWidget(title)
-        header_layout.addStretch()
-        create_order_btn = QPushButton("Create Order")
-        create_order_btn.setMinimumHeight(40)
-        create_order_btn.clicked.connect(self.generate_order)
-        header_layout.addWidget(create_order_btn)
-        layout.addLayout(header_layout)
-        # Orders table
-        self.orders_table = QTableWidget()
-        self.orders_table.setColumnCount(6)
-        self.orders_table.setHorizontalHeaderLabels(
-            ["Order ID", "Date", "Supplier", "Items", "Total", "Status"]
-        )
-        self.orders_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.orders_table.setAlternatingRowColors(True)
-        self.orders_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        layout.addWidget(self.orders_table)
-        self.refresh_orders_table()
-        self.stacked_widget.addWidget(page)
-
-    def create_alerts_page(self):
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
-        # Header
-        header_layout = QHBoxLayout()
-        title = QLabel("Low Stock Alerts")
-        title.setStyleSheet("font-size: 22px; font-weight: bold; margin-right: 24px;")
-        header_layout.addWidget(title)
-        header_layout.addStretch()
-        send_alerts_btn = QPushButton("Send Alerts")
-        send_alerts_btn.setMinimumHeight(40)
-        send_alerts_btn.clicked.connect(self.send_low_stock_alerts)
-        header_layout.addWidget(send_alerts_btn)
-        layout.addLayout(header_layout)
-        # Alerts table
-        self.alerts_table = QTableWidget()
-        self.alerts_table.setColumnCount(5)
-        self.alerts_table.setHorizontalHeaderLabels(
-            ["Medicine", "Current Stock", "Threshold", "Status", "Action"]
-        )
-        self.alerts_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.alerts_table.setAlternatingRowColors(True)
-        self.alerts_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        layout.addWidget(self.alerts_table)
-        self.refresh_alerts_table()
-        self.stacked_widget.addWidget(page)
-
-    def create_sales_page(self):
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
-        # Header
-        header_layout = QHBoxLayout()
-        title = QLabel("Sales Reports")
-        title.setStyleSheet("font-size: 22px; font-weight: bold; margin-right: 24px;")
-        header_layout.addWidget(title)
-        header_layout.addStretch()
-        export_btn = QPushButton("Export CSV")
-        export_btn.setMinimumHeight(40)
-        export_btn.clicked.connect(self._export_monthly_sales_csv)
-        header_layout.addWidget(export_btn)
-        layout.addLayout(header_layout)
-        # Monthly sales table
-        self.sales_table = QTableWidget()
-        self.sales_table.setColumnCount(4)
-        self.sales_table.setHorizontalHeaderLabels(
-            ["Month", "Total Sales", "Number of Bills", "Average Bill"]
-        )
-        self.sales_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.sales_table.setAlternatingRowColors(True)
-        self.sales_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        layout.addWidget(self.sales_table)
-        self._refresh_monthly_sales()
-        self.stacked_widget.addWidget(page)
-
-    def create_settings_page(self):
-        page = QWidget()
-        layout = QHBoxLayout(page)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
-        # Left: Settings buttons
-        button_panel = QWidget()
-        button_layout = QVBoxLayout(button_panel)
-        button_layout.setSpacing(16)
-        button_layout.setAlignment(Qt.AlignTop)
-        notification_btn = QPushButton("Notification Settings")
-        notification_btn.setMinimumHeight(50)
-        notification_btn.clicked.connect(
-            lambda: self.show_settings_panel("notification")
-        )
-        button_layout.addWidget(notification_btn)
-        pharmacy_btn = QPushButton("Pharmacy Details")
-        pharmacy_btn.setMinimumHeight(50)
-        pharmacy_btn.clicked.connect(lambda: self.show_settings_panel("pharmacy"))
-        button_layout.addWidget(pharmacy_btn)
-        button_layout.addStretch()
-        layout.addWidget(button_panel, 0)
-        # Right: Settings panel area (QStackedWidget)
-        self.settings_panel = QStackedWidget()
-        layout.addWidget(self.settings_panel, 1)
-        from dialogs import NotificationSettingsDialog, PharmacyDetailsDialog
-
-        self.notification_settings_widget = NotificationSettingsDialog(parent=self)
-        self.pharmacy_details_widget = PharmacyDetailsDialog(parent=self)
-        self.settings_panel.addWidget(self.notification_settings_widget)
-        self.settings_panel.addWidget(self.pharmacy_details_widget)
-        self.settings_panel.setCurrentIndex(-1)
-        self.stacked_widget.addWidget(page)
-
-    def show_settings_panel(self, panel_name):
-        """Show the selected settings panel in the settings page."""
+    def show_settings_panel(self, panel_name: str) -> None:
+        """
+        Show the selected settings panel in the settings page.
+        :param panel_name: Name of the settings panel to show
+        """
         if panel_name == "notification":
-            self.settings_panel.setCurrentIndex(0)
+            self.settings_ui.settings_panel.setCurrentIndex(0)
         elif panel_name == "pharmacy":
-            self.settings_panel.setCurrentIndex(1)
+            self.settings_ui.settings_panel.setCurrentIndex(1)
 
-    def show_inventory_panel(self, panel_name):
-        """Show the selected inventory panel in the inventory page, always with up-to-date inventory."""
+    def show_inventory_panel(self, panel_name: str) -> None:
+        """
+        Show the selected inventory panel in the inventory page, always with up-to-date inventory.
+        :param panel_name: Name of the inventory panel to show
+        """
         from PyQt5.QtWidgets import QFrame
 
         from db import get_all_medicines
@@ -606,7 +412,7 @@ class MainWindow(QMainWindow):
                 old_widget = self.inventory_panel.widget(0)
                 self.inventory_panel.removeWidget(old_widget)
                 old_widget.deleteLater()
-            new_widget = BulkThresholdDialog(medicines, parent=self)
+            new_widget = BulkThresholdDialog(medicines, self)
             self.inventory_panel.insertWidget(0, new_widget)
             self.inventory_panel.setCurrentIndex(0)
             panel_frame.setVisible(True)
@@ -617,35 +423,30 @@ class MainWindow(QMainWindow):
                 old_widget = self.inventory_panel.widget(1)
                 self.inventory_panel.removeWidget(old_widget)
                 old_widget.deleteLater()
-            new_widget = QuickAddStockDialog(medicines, parent=self)
+            new_widget = QuickAddStockDialog(medicines, self)
             self.inventory_panel.insertWidget(1, new_widget)
             self.inventory_panel.setCurrentIndex(1)
             panel_frame.setVisible(True)
         else:
             panel_frame.setVisible(False)
 
-    def refresh_inventory_table(self):
-        """Refresh the inventory table with current data and update the all_medicines cache"""
-        from db import get_all_medicines
-
-        self.all_medicines = get_all_medicines()
+    def refresh_inventory_table(self) -> None:
+        """
+        Refresh the inventory table with current data and update the all_medicines cache.
+        """
+        self.all_medicines = self.inventory_service.get_all()
         self.filter_inventory_table()
 
-    def filter_inventory_table(self):
-        """Filter the inventory table based on the search box text"""
+    def filter_inventory_table(self) -> None:
+        """
+        Filter the inventory table based on the search box text.
+        """
         query = (
             self.inventory_search_box.text().strip().lower()
             if hasattr(self, "inventory_search_box")
             else ""
         )
-        filtered = []
-        for med in self.all_medicines:
-            if (
-                query in med.name.lower()
-                or query in med.barcode.lower()
-                or (med.manufacturer and query in med.manufacturer.lower())
-            ):
-                filtered.append(med)
+        filtered = self.inventory_service.search(query)
         self.inventory_table.setRowCount(len(filtered))
         for i, medicine in enumerate(filtered):
             self.inventory_table.setItem(i, 0, QTableWidgetItem(medicine.barcode))
@@ -666,72 +467,104 @@ class MainWindow(QMainWindow):
                 i, 6, QTableWidgetItem(f"₹{getattr(medicine, 'price', 0)}")
             )
 
-    def on_inventory_cell_double_clicked(self, row, column):
-        """Handle double-click on inventory table"""
+    def on_inventory_cell_double_clicked(self, row: int, column: int) -> None:
+        """
+        Handle double-click on inventory table.
+        :param row: Row index
+        :param column: Column index
+        """
         barcode = self.inventory_table.item(row, 0).text()
-        medicines = get_all_medicines()
+        medicines = self.inventory_service.get_all()
         medicine = next((m for m in medicines if m.barcode == barcode), None)
 
         if medicine:
             dialog = EditMedicineDialog(medicine, self)
             if dialog.exec_() == QDialog.Accepted:
+                # Save changes using service
+                data = dialog.get_data()
+                self.inventory_service.update(barcode, data)
                 self.refresh_inventory_table()
 
-    def open_add_medicine_dialog(self):
-        """Open the add medicine dialog"""
+    def open_add_medicine_dialog(self) -> None:
+        """
+        Open the add medicine dialog and add a new medicine if accepted.
+        """
         dialog = AddMedicineDialog(self)
         if dialog.exec_() == QDialog.Accepted:
             data = dialog.get_data()
-            success, error = add_medicine(
-                data["barcode"],
-                data["name"],
-                data["quantity"],
-                data["expiry"],
-                data["manufacturer"],
-                data["price"],
-                data["threshold"],
-            )
+            success, error = self.inventory_service.add(data)
             if success:
                 self.refresh_inventory_table()
                 QMessageBox.information(self, "Success", "Medicine added successfully!")
             else:
                 QMessageBox.warning(self, "Error", f"Failed to add medicine: {error}")
 
-    def open_barcode_scanner(self):
-        """Open the barcode scanner dialog"""
+    def open_barcode_scanner(self) -> None:
+        """
+        Open the barcode scanner dialog and add medicine by scanned barcode.
+        """
         dialog = BarcodeScannerDialog(self)
         if dialog.exec_() == QDialog.Accepted:
             barcode = dialog.get_barcode()
             if barcode:
                 self.open_add_medicine_dialog(barcode)
 
-    def generate_order(self):
-        """Generate order for low stock medicines"""
-        low_stock_medicines = get_low_stock_medicines()
+    def generate_order(self) -> None:
+        """
+        Generate an order for low stock medicines and save it if confirmed.
+        """
+        low_stock_medicines = self.order_service.get_low_stock()
         if not low_stock_medicines:
             QMessageBox.information(
                 self, "No Orders Needed", "All medicines have sufficient stock."
             )
             return
-
         dialog = OrderQuantityDialog(low_stock_medicines, self)
         if dialog.exec_() == QDialog.Accepted:
             quantities = dialog.get_order_quantities()
-            # Generate order logic here
-            QMessageBox.information(
-                self, "Order Generated", "Order has been generated successfully!"
-            )
+            # Prepare order items based on selected quantities
+            order_items = []
+            for med in low_stock_medicines:
+                qty = quantities.get(med.barcode, 0)
+                if qty > 0:
+                    order_items.append({
+                        "barcode": med.barcode,
+                        "name": med.name,
+                        "quantity": med.quantity,
+                        "expiry": med.expiry,
+                        "manufacturer": med.manufacturer,
+                        "order_quantity": qty,
+                    })
+            if order_items:
+                import datetime
+                timestamp_str = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
+                order_id = int(datetime.datetime.now().timestamp())  # simple unique ID
+                pdf_path = self.order_service.generate_order_pdf(order_items, order_id, timestamp_str)
+                success, error = self.order_service.add(timestamp_str, pdf_path, order_items)
+                if success:
+                    QMessageBox.information(self, "Order Generated", "Order has been generated and saved successfully!")
+                    self.refresh_orders_table()
+                else:
+                    QMessageBox.warning(self, "Error", f"Failed to save order: {error}")
+            else:
+                QMessageBox.warning(self, "No Items", "No order items were selected.")
 
-    def set_theme_from_menu(self, theme):
-        """Set theme from menu"""
-        set_theme(theme)
+    def set_theme_from_menu(self, theme: str) -> None:
+        """
+        Set the application theme from the menu.
+        :param theme: Theme string ('light' or 'dark')
+        """
+        self.settings_service.set_theme(theme)
         self.theme = theme
         self.setStyleSheet(get_stylesheet())
         # Update all text styles
         self.update_all_text_styles()
 
-    def get_navbar_button_stylesheet(self):
-        """Get navbar button stylesheet based on current theme"""
+    def get_navbar_button_stylesheet(self) -> str:
+        """
+        Get navbar button stylesheet based on current theme.
+        :return: Stylesheet string
+        """
         if self.theme == "dark":
             return """
                 QPushButton {
@@ -773,35 +606,59 @@ class MainWindow(QMainWindow):
                 }
             """
 
-    def update_navbar_styles(self):
-        """Update navbar button styles when theme changes"""
+    def update_navbar_styles(self) -> None:
+        """
+        Update navbar button styles when theme changes
+        """
         for btn in self.nav_buttons:
             btn.setStyleSheet(self.get_navbar_button_stylesheet())
 
-    def get_pharmacy_name_stylesheet(self):
-        """Get pharmacy name stylesheet based on current theme"""
+    def get_pharmacy_name_stylesheet(self) -> str:
+        """
+        Get pharmacy name stylesheet based on current theme.
+        :return: Stylesheet string
+        """
         if self.theme == "dark":
             return "font-size: 28px; font-weight: bold; color: #D4D4D4; margin: 18px 0 24px 0;"
         else:
             return "font-size: 28px; font-weight: bold; color: #333333; margin: 18px 0 24px 0;"
 
-    def get_page_title_stylesheet(self, accent_color=None):
-        """Get page title stylesheet based on current theme with accent color"""
+    def get_page_title_stylesheet(self, accent_color=None) -> str:
+        """
+        Get page title stylesheet based on current theme with accent color.
+        :param accent_color: Optional accent color for the page title
+        :return: Stylesheet string
+        """
         if self.theme == "dark":
             return "font-size: 24px; font-weight: bold; color: #D4D4D4;"
         else:
             # Use blue accent for page titles in light mode
             return "font-size: 24px; font-weight: bold; color: #1976d2;"
 
-    def get_bill_summary_total_stylesheet(self):
-        """Get stylesheet for the bill summary total label based on the current theme."""
+    def get_bill_summary_total_stylesheet(self) -> str:
+        """
+        Get stylesheet for the bill summary total label based on the current theme.
+        :return: Stylesheet string
+        """
         if self.theme == "dark":
-            return "font-size: 18px; font-weight: bold; color: #D4D4D4;"
+            return "font-size: 12px; font-weight: bold; color: #D4D4D4;"
         else:
-            return "font-size: 18px; font-weight: bold; color: #1976d2;"
+            return "font-size: 12px; font-weight: bold; color: #1976d2;"
 
-    def update_all_text_styles(self):
-        """Update all text and button styles when theme changes"""
+    def get_section_title_stylesheet(self) -> str:
+        """
+        Get section title stylesheet: same color as page title, 16px, bold.
+        :return: Stylesheet string
+        """
+        if self.theme == "dark":
+            return "font-size: 16px; font-weight: bold; color: #D4D4D4;"
+        else:
+            return "font-size: 16px; font-weight: bold; color: #1976d2;"
+
+    def update_all_text_styles(self) -> None:
+        """
+        Update all text and button styles when theme changes
+        """
         # Update pharmacy name
         self.pharmacy_name_label.setStyleSheet(self.get_pharmacy_name_stylesheet())
         # Update navbar styles
@@ -836,8 +693,10 @@ class MainWindow(QMainWindow):
         for btn, icon in zip(self.nav_buttons, nav_icons):
             btn.setIcon(icon)
 
-    def show_about_dialog(self):
-        """Show about dialog"""
+    def show_about_dialog(self) -> None:
+        """
+        Show about dialog
+        """
         QMessageBox.about(
             self,
             "About Medibit",
@@ -847,36 +706,26 @@ class MainWindow(QMainWindow):
             "Developed by Octobit8",
         )
 
-    def send_low_stock_alerts(self):
-        """Send low stock alerts"""
-        low_stock_medicines = get_low_stock_medicines()
-        if not low_stock_medicines:
-            QMessageBox.information(
-                self, "No Alerts", "No medicines are below threshold."
-            )
-            return
+    def send_low_stock_alerts(self) -> None:
+        """
+        Send low stock alerts
+        """
+        success, msg = self.alert_service.send_all_alerts()
+        if success:
+            QMessageBox.information(self, "Alerts Sent", msg)
+        else:
+            QMessageBox.warning(self, "Alerts Failed", msg)
 
-        results = self.notification_manager.send_all_alerts(low_stock_medicines)
-
-        # Show results
-        message = "Alert results:\n\n"
-        for channel, success, msg in results:
-            status = "✅ Sent" if success else "❌ Failed"
-            message += f"{channel}: {status}\n{msg}\n\n"
-
-        QMessageBox.information(self, "Alert Results", message)
-
-    def open_notification_settings(self):
-        """Open notification settings dialog"""
+    def open_notification_settings(self) -> None:
         dialog = NotificationSettingsDialog(self)
         dialog.exec_()
 
-    def update_pharmacy_name_label(self):
-        """Update the pharmacy name label with the latest name from settings."""
+    def update_pharmacy_name_label(self) -> None:
+        """
+        Update the pharmacy name label with the latest name from settings.
+        """
         try:
             details = get_pharmacy_details()
-            print("DEBUG: pharmacy details returned:", details)
-            # Try both dict and object access
             if details:
                 if isinstance(details, dict):
                     pharmacy_name = details.get("name", "").strip()
@@ -884,23 +733,21 @@ class MainWindow(QMainWindow):
                     pharmacy_name = getattr(details, "name", "").strip()
             else:
                 pharmacy_name = ""
-            print("DEBUG: pharmacy_name:", pharmacy_name)
             if not pharmacy_name:
                 pharmacy_name = "Pharmacy"
             self.pharmacy_name_label.setText(pharmacy_name)
-            print("DEBUG: Set pharmacy name label to:", pharmacy_name)
         except Exception as e:
-            print("DEBUG: Exception in update_pharmacy_name_label:", e)
             self.pharmacy_name_label.setText("Pharmacy")
 
-    def open_pharmacy_details(self):
-        """Open pharmacy details dialog"""
+    def open_pharmacy_details(self) -> None:
         dialog = PharmacyDetailsDialog(self)
         if dialog.exec_() == QDialog.Accepted:
             self.update_pharmacy_name_label()
 
-    def open_bulk_threshold_dialog(self):
-        """Open bulk threshold dialog"""
+    def open_bulk_threshold_dialog(self) -> None:
+        """
+        Open bulk threshold dialog
+        """
         medicines = get_all_medicines()
         if not medicines:
             QMessageBox.information(
@@ -908,12 +755,15 @@ class MainWindow(QMainWindow):
             )
             return
 
-        dialog = BulkThresholdDialog(medicines, self)
-        if dialog.exec_() == QDialog.Accepted:
-            self.refresh_inventory_table()
+        self.bulk_threshold_dialog = BulkThresholdDialog(medicines, self)
+        self.bulk_threshold_dialog.exec_()
+        self.bulk_threshold_dialog = None
+        self.refresh_inventory_table()
 
-    def open_quick_add_stock_dialog(self):
-        """Open quick add stock dialog"""
+    def open_quick_add_stock_dialog(self) -> None:
+        """
+        Open quick add stock dialog
+        """
         medicines = get_all_medicines()
         if not medicines:
             QMessageBox.information(
@@ -921,21 +771,27 @@ class MainWindow(QMainWindow):
             )
             return
 
-        dialog = QuickAddStockDialog(medicines, self)
-        if dialog.exec_() == QDialog.Accepted:
+        self.quick_add_stock_dialog = QuickAddStockDialog(medicines, self)
+        if self.quick_add_stock_dialog.exec_() == QDialog.Accepted:
             self.refresh_inventory_table()
+        self.quick_add_stock_dialog = None
 
     # Billing methods
-    def scan_billing_barcode(self):
-        """Scan barcode for billing"""
+    def scan_billing_barcode(self) -> None:
+        """
+        Scan barcode for billing
+        """
         dialog = BarcodeScannerDialog(self)
         if dialog.exec_() == QDialog.Accepted:
             barcode = dialog.get_barcode()
             if barcode:
                 self._add_billing_item(barcode)
 
-    def _add_billing_item(self, barcode):
-        """Add item to billing table by barcode"""
+    def _add_billing_item(self, barcode: str) -> None:
+        """
+        Add item to billing table by barcode
+        :param barcode: Barcode of the medicine to add
+        """
         # Look up medicine by barcode
         from db import get_medicine_by_barcode
 
@@ -962,130 +818,149 @@ class MainWindow(QMainWindow):
         self.billing_table.setItem(row, 0, QTableWidgetItem(barcode))
         self.billing_table.setItem(row, 1, QTableWidgetItem(medicine.name))
         self.billing_table.setItem(row, 2, QTableWidgetItem("1"))
-        self.billing_table.setItem(
-            row, 3, QTableWidgetItem(f"₹{getattr(medicine, 'price', 0)}")
-        )
-        self.billing_table.setItem(
-            row, 4, QTableWidgetItem(f"₹{getattr(medicine, 'price', 0)}")
-        )
+        self.billing_table.setItem(row, 3, QTableWidgetItem(f"₹{getattr(medicine, 'price', 0)}"))
+        self.billing_table.setItem(row, 4, QTableWidgetItem("0"))  # Tax
+        self.billing_table.setItem(row, 5, QTableWidgetItem("0"))  # Discount
+        self.billing_table.setItem(row, 6, QTableWidgetItem(f"₹{getattr(medicine, 'price', 0)}"))
 
         self._refresh_billing_table()
 
-    def _refresh_billing_table(self):
-        """Refresh billing table totals"""
-        total = 0
+    def _refresh_billing_table(self) -> None:
+        """
+        Refresh billing table totals and bill summary, applying discounts and tax.
+        """
+        subtotal = 0
         for row in range(self.billing_table.rowCount()):
             try:
-                quantity = int(self.billing_table.item(row, 2).text())
-                price = float(self.billing_table.item(row, 3).text().replace("₹", ""))
-                item_total = quantity * price
-                self.billing_table.setItem(
-                    row, 4, QTableWidgetItem(f"₹{item_total:.2f}")
-                )
-                total += item_total
-            except (ValueError, AttributeError):
-                pass
-
-        self.total_label.setText(f"Total: ₹{total:.2f}")
-
-    def _on_billing_table_item_changed(self, item):
-        """Handle billing table item changes"""
-        # Only handle quantity column
-        if item.column() == 2:
-            try:
-                quantity = int(item.text())
-                if quantity < 0:
-                    item.setText("0")
-                    quantity = 0
-                row = item.row()
+                qty_item = self.billing_table.item(row, 2)
+                quantity = int(qty_item.text()) if qty_item and qty_item.text() and qty_item.text().isdigit() else 0
                 price_item = self.billing_table.item(row, 3)
-                if price_item is None or not price_item.text():
-                    price = 0.0
-                else:
-                    price = float(price_item.text().replace("₹", ""))
-                total = quantity * price
-                self.billing_table.setItem(row, 4, QTableWidgetItem(f"₹{total:.2f}"))
-                self._refresh_billing_table()
-            except ValueError:
-                item.setText("0")
+                price_text = price_item.text().replace("₹", "") if price_item and price_item.text() else "0"
+                price = float(price_text) if price_text.replace('.', '', 1).isdigit() else 0.0
+                discount_item = self.billing_table.item(row, 5)
+                discount_text = discount_item.text() if discount_item and discount_item.text() else "0"
+                try:
+                    discount = float(discount_text)
+                except ValueError:
+                    discount = 0.0
+                item_total = max(0, (price - discount)) * quantity
+                self.billing_table.setItem(row, 6, QTableWidgetItem(f"₹{item_total:.2f}"))
+                subtotal += item_total
+            except Exception:
+                self.billing_table.setItem(row, 6, QTableWidgetItem("₹0.00"))
+        # Apply tax to subtotal
+        tax_percent = self.tax_spin.value() if hasattr(self, 'tax_spin') else 0
+        tax_amount = subtotal * (tax_percent / 100)
+        total = subtotal + tax_amount
+        self.total_label.setText(f"Total: ₹{total:.2f} (Tax: ₹{tax_amount:.2f})")
 
-    def _refresh_billing_history(self):
-        """Refresh billing history list"""
+    def _on_billing_table_item_changed(self, item: QTableWidgetItem) -> None:
+        # Recalculate totals if quantity, price, or discount changes
+        if item.column() in [2, 3, 5]:
+            self._refresh_billing_table()
+
+    def _refresh_billing_history(self) -> None:
+        """
+        Refresh billing history list
+        """
         # Clear layout
         for i in reversed(range(self.billing_history_list.count())):
             self.billing_history_list.takeItem(i)
 
+        # Add all drafts if exist
+        import os, json, re
+        if os.path.exists('drafts'):
+            for fname in sorted(os.listdir('drafts')):
+                if re.match(r'draft_bill_.*\.json$', fname) or re.match(r'draft_bill_.*\.json$', fname):
+                    path = os.path.join('drafts', fname)
+                    try:
+                        with open(path, 'r', encoding='utf-8') as f:
+                            draft = json.load(f)
+                    except json.JSONDecodeError as e:
+                        logger.error(f"Failed to decode JSON draft {path}: {e}")
+                        QMessageBox.warning(self, "Draft Error", f"Could not load draft {fname}: Invalid file format.")
+                        continue
+                    except Exception as e:
+                        logger.error(f"Failed to read draft {path}: {e}")
+                        QMessageBox.warning(self, "Draft Error", f"Could not load draft {fname}: {e}")
+                        continue
+                    label = f"Draft Bill: {fname.replace('draft_bill_', '').replace('.json', '')}"
+                    item = QListWidgetItem(label)
+                    item.setData(Qt.UserRole, {'is_draft': True, 'draft': draft, 'draft_path': path})
+                    self.billing_history_list.addItem(item)
+
         # Get recent bills
-        bills = get_all_bills()
-        for bill in bills[-10:]:  # Show last 10 bills
+        bills = self.billing_service.get_recent_bills(10)
+        for bill in bills:
             item_text = f"Bill #{bill.id} - {bill.timestamp} - ₹{bill.total}"
             item = QListWidgetItem(item_text)
-            item.setData(Qt.UserRole, bill.id)
+            item.setData(Qt.UserRole, bill)  # Store the full bill object
             self.billing_history_list.addItem(item)
 
-    def _refresh_monthly_sales(self):
-        """Refresh monthly sales table"""
-        sales_data = get_monthly_sales()
-        self.sales_table.setRowCount(len(sales_data))
+    def _refresh_monthly_sales(self) -> None:
+        """
+        Refresh monthly sales table
+        """
+        sales_data = self.billing_service.get_sales_data()
+        self.sales_ui.sales_table.setRowCount(len(sales_data))
 
         for i, (month, total, count, avg) in enumerate(sales_data):
-            self.sales_table.setItem(i, 0, QTableWidgetItem(month))
-            # Convert total to float if it's a string
+            self.sales_ui.sales_table.setItem(i, 0, QTableWidgetItem(month))
             try:
-                total_float = float(total) if isinstance(total, str) else total
-                self.sales_table.setItem(i, 1, QTableWidgetItem(f"₹{total_float:.2f}"))
-            except (ValueError, TypeError):
-                self.sales_table.setItem(i, 1, QTableWidgetItem(str(total)))
-
-            self.sales_table.setItem(i, 2, QTableWidgetItem(str(count)))
-
-            # Convert avg to float if it's a string
+                total_float = float(total)
+                self.sales_ui.sales_table.setItem(i, 1, QTableWidgetItem(f"₹{total_float:.2f}"))
+            except Exception:
+                self.sales_ui.sales_table.setItem(i, 1, QTableWidgetItem(str(total)))
+            self.sales_ui.sales_table.setItem(i, 2, QTableWidgetItem(str(count)))
             try:
-                avg_float = float(avg) if isinstance(avg, str) else avg
-                self.sales_table.setItem(i, 3, QTableWidgetItem(f"₹{avg_float:.2f}"))
-            except (ValueError, TypeError):
-                self.sales_table.setItem(i, 3, QTableWidgetItem(str(avg)))
+                avg_float = float(avg)
+                self.sales_ui.sales_table.setItem(i, 3, QTableWidgetItem(f"₹{avg_float:.2f}"))
+            except Exception:
+                self.sales_ui.sales_table.setItem(i, 3, QTableWidgetItem(str(avg)))
 
-    def _export_monthly_sales_csv(self):
-        """Export monthly sales to CSV"""
+    def _export_monthly_sales_csv(self) -> None:
+        """
+        Export monthly sales to CSV
+        """
         try:
-            sales_data = get_monthly_sales()
+            sales_data = self.billing_service.get_sales_data()
             filename, _ = QFileDialog.getSaveFileName(
                 self, "Export Monthly Sales", "monthly_sales.csv", "CSV Files (*.csv)"
             )
-
-            if filename:
-                with open(filename, "w", newline="", encoding="utf-8") as csvfile:
-                    writer = csv.writer(csvfile)
-                    writer.writerow(
-                        ["Month", "Total Sales", "Number of Bills", "Average Bill"]
-                    )
-                    for month, total, count, avg in sales_data:
-                        # Convert total and avg to float if they're strings
-                        try:
-                            total_float = (
-                                float(total) if isinstance(total, str) else total
-                            )
-                            avg_float = float(avg) if isinstance(avg, str) else avg
-                            writer.writerow(
-                                [
-                                    month,
-                                    f"₹{total_float:.2f}",
-                                    count,
-                                    f"₹{avg_float:.2f}",
-                                ]
-                            )
-                        except (ValueError, TypeError):
-                            writer.writerow([month, str(total), count, str(avg)])
-
-                QMessageBox.information(
-                    self, "Success", f"Sales data exported to {filename}"
+            if not filename:
+                return
+            with open(filename, "w", newline="", encoding="utf-8") as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(
+                    ["Month", "Total Sales", "Number of Bills", "Average Bill"]
                 )
+                for month, total, count, avg in sales_data:
+                    try:
+                        total_float = (
+                            float(total) if isinstance(total, str) else total
+                        )
+                        avg_float = float(avg) if isinstance(avg, str) else avg
+                        writer.writerow(
+                            [
+                                month,
+                                f"₹{total_float:.2f}",
+                                count,
+                                f"₹{avg_float:.2f}",
+                            ]
+                        )
+                    except (ValueError, TypeError):
+                        writer.writerow([month, str(total), count, str(avg)])
+            QMessageBox.information(
+                self, "Success", f"Sales data exported to {filename}"
+            )
         except Exception as e:
+            logger.error(f"Failed to export sales data: {e}")
             QMessageBox.warning(self, "Error", f"Failed to export sales data: {str(e)}")
 
-    def complete_sale(self):
-        """Complete the sale and generate receipt"""
+    def complete_sale(self) -> None:
+        """
+        Complete the sale and generate receipt
+        """
         if self.billing_table.rowCount() == 0:
             QMessageBox.warning(
                 self, "Empty Bill", "Please add items to the bill first."
@@ -1099,7 +974,7 @@ class MainWindow(QMainWindow):
             "email": self.customer_email.text(),
         }
 
-        # Calculate total
+        # Calculate total and items
         total = 0
         items = []
         for row in range(self.billing_table.rowCount()):
@@ -1108,7 +983,6 @@ class MainWindow(QMainWindow):
             quantity = int(self.billing_table.item(row, 2).text())
             price = float(self.billing_table.item(row, 3).text().replace("₹", ""))
             item_total = quantity * price
-
             items.append(
                 {
                     "barcode": barcode,
@@ -1120,27 +994,16 @@ class MainWindow(QMainWindow):
             )
             total += item_total
 
-        # Save bill to database
-        timestamp = datetime.datetime.now()
-        try:
-            add_bill(timestamp, total, items)
-        except Exception as e:
-            QMessageBox.warning(self, "Error", f"Failed to save bill: {str(e)}")
+        # Save bill and update inventory using service
+        success, error, _ = self.billing_service.create_bill(items, customer_data)
+        if not success:
+            QMessageBox.warning(self, "Error", f"Failed to save bill: {error}")
             return
 
-        # Update medicine quantities
-        for item in items:
-            from db import get_medicine_by_barcode, update_medicine_quantity
-
-            medicine = get_medicine_by_barcode(item["barcode"])
-            if medicine:
-                new_quantity = medicine.quantity - item["quantity"]
-                if new_quantity < 0:
-                    new_quantity = 0
-                update_medicine_quantity(item["barcode"], new_quantity)
-
         # Generate receipt
-        receipt_path = self._generate_receipt(timestamp, items, total)
+        details = get_pharmacy_details()
+        timestamp = datetime.datetime.now()
+        receipt_path = self.billing_service.generate_receipt(timestamp, items, total, details)
 
         # Send receipt via WhatsApp and Email
         try:
@@ -1163,8 +1026,6 @@ class MainWindow(QMainWindow):
             )
             QMessageBox.information(self, "Receipt Notification", result_msg)
         except Exception as e:
-            import traceback
-
             print("Exception during receipt notification:", traceback.format_exc())
             QMessageBox.warning(
                 self,
@@ -1185,91 +1046,56 @@ class MainWindow(QMainWindow):
         self._refresh_billing_history()
         self._refresh_monthly_sales()
 
-    def _generate_receipt(self, timestamp, items, total):
-        """Generate receipt for the sale"""
-        # Get pharmacy details
-        details = get_pharmacy_details()
-        pharmacy_name = (
-            details.name if details and hasattr(details, "name") else "Pharmacy"
-        )
-        pharmacy_address = (
-            details.address if details and hasattr(details, "address") else ""
-        )
-        pharmacy_phone = details.phone if details and hasattr(details, "phone") else ""
+    def _generate_receipt(self, timestamp: datetime.datetime, items: list, total: float) -> None:
+        """
+        Generate receipt for the sale
+        """
+        # Deprecated: now handled by BillingService
+        return None
 
-        # Create receipt content
-        receipt_content = f"""
-{pharmacy_name.upper()}
-{pharmacy_address}
-Phone: {pharmacy_phone}
-Date: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}
-{'='*40}
-
-Items:
-"""
-
-        for item in items:
-            receipt_content += f"{item['name']}\n"
-            receipt_content += f"  {item['quantity']} x ₹{item['price']:.2f} = ₹{item['subtotal']:.2f}\n"
-
-        receipt_content += f"""
-{'='*40}
-Total: ₹{total:.2f}
-{'='*40}
-
-Thank you for your purchase!
-"""
-
-        # Save receipt to file
-        receipt_dir = "receipts"
-        if not os.path.exists(receipt_dir):
-            os.makedirs(receipt_dir)
-
-        receipt_filename = f"receipt_{timestamp.strftime('%Y%m%d_%H%M%S')}.txt"
-        receipt_path = os.path.join(receipt_dir, receipt_filename)
-
-        with open(receipt_path, "w", encoding="utf-8") as f:
-            f.write(receipt_content)
-
-        return receipt_path
-
-    def clear_bill(self):
-        """Clear the current bill"""
+    def clear_bill(self) -> None:
+        """
+        Clear the current bill
+        """
         self.billing_table.setRowCount(0)
         self.customer_name.clear()
         self.customer_phone.clear()
         self.customer_email.clear()
+        self.customer_address.clear()
+        self.customer_age.clear()
+        self.customer_gender.setCurrentIndex(0)
         self.total_label.setText("Total: ₹0.00")
 
-    def refresh_orders_table(self):
-        """Refresh the orders table"""
-        orders = get_all_orders()
-        self.orders_table.setRowCount(len(orders))
+    def refresh_orders_table(self) -> None:
+        """
+        Refresh the orders table
+        """
+        orders = self.order_service.get_all()
+        self.orders_ui.orders_table.setRowCount(len(orders))
         for i, order in enumerate(orders):
-            self.orders_table.setItem(i, 0, QTableWidgetItem(str(order.id)))
-            self.orders_table.setItem(i, 1, QTableWidgetItem(str(order.timestamp)))
-            self.orders_table.setItem(
+            self.orders_ui.orders_table.setItem(i, 0, QTableWidgetItem(str(order.id)))
+            self.orders_ui.orders_table.setItem(i, 1, QTableWidgetItem(str(order.timestamp)))
+            self.orders_ui.orders_table.setItem(
                 i, 2, QTableWidgetItem(str(getattr(order, "supplier", "N/A")))
             )
-            self.orders_table.setItem(
+            self.orders_ui.orders_table.setItem(
                 i, 3, QTableWidgetItem(str(len(getattr(order, "meds", []))))
             )
-            self.orders_table.setItem(
-                i, 4, QTableWidgetItem(str(getattr(order, "total", "N/A")))
-            )
-            self.orders_table.setItem(
-                i, 5, QTableWidgetItem(str(getattr(order, "status", "N/A")))
+            self.orders_ui.orders_table.setItem(
+                i, 4, QTableWidgetItem(str(getattr(order, "status", "N/A")))
             )
 
-    def refresh_alerts_table(self):
-        """Refresh the alerts table"""
-        low_stock_medicines = get_low_stock_medicines()
-        self.alerts_table.setRowCount(len(low_stock_medicines))
+    def refresh_alerts_table(self) -> None:
+        """
+        Refresh the alerts table
+        """
+        low_stock_medicines = self.order_service.get_low_stock()
+        self.alerts_ui.alerts_table.setRowCount(len(low_stock_medicines))
 
         for i, medicine in enumerate(low_stock_medicines):
-            self.alerts_table.setItem(i, 0, QTableWidgetItem(medicine.name))
-            self.alerts_table.setItem(i, 1, QTableWidgetItem(str(medicine.quantity)))
-            self.alerts_table.setItem(
+            self.alerts_ui.alerts_table.setItem(i, 0, QTableWidgetItem(medicine.name))
+            self.alerts_ui.alerts_table.setItem(i, 1, QTableWidgetItem(str(medicine.quantity)))
+            self.alerts_ui.alerts_table.setItem(
                 i, 2, QTableWidgetItem(str(getattr(medicine, "threshold", 10)))
             )
 
@@ -1283,23 +1109,29 @@ Thank you for your purchase!
 
             status_item = QTableWidgetItem(status)
             status_item.setBackground(status_color)
-            self.alerts_table.setItem(i, 3, status_item)
+            self.alerts_ui.alerts_table.setItem(i, 3, status_item)
 
             # Action button
             action_btn = QPushButton("Set Threshold")
             action_btn.clicked.connect(
                 lambda checked, med=medicine: self._open_threshold_dialog(med)
             )
-            self.alerts_table.setCellWidget(i, 4, action_btn)
+            self.alerts_ui.alerts_table.setCellWidget(i, 4, action_btn)
 
-    def _open_threshold_dialog(self, medicine):
-        """Open threshold setting dialog for a specific medicine"""
+    def _open_threshold_dialog(self, medicine: dict) -> None:
+        """
+        Open threshold setting dialog for a specific medicine
+        :param medicine: Medicine dictionary
+        """
         dialog = ThresholdSettingDialog(medicine, self)
         if dialog.exec_() == QDialog.Accepted:
             self.refresh_alerts_table()
 
-    def get_button_stylesheet(self):
-        """Get general button stylesheet based on current theme"""
+    def get_button_stylesheet(self) -> str:
+        """
+        Get general button stylesheet based on current theme, with push animation.
+        :return: Stylesheet string
+        """
         if self.theme == "dark":
             return """
                 QPushButton {
@@ -1309,6 +1141,7 @@ Thank you for your purchase!
                     border-radius: 4px;
                     padding: 8px 16px;
                     font-weight: bold;
+                    transition: all 0.1s;
                 }
                 QPushButton:hover {
                     background-color: #505050;
@@ -1316,6 +1149,7 @@ Thank you for your purchase!
                 }
                 QPushButton:pressed {
                     background-color: #303030;
+                    transform: scale(0.97);
                 }
                 QPushButton:disabled {
                     background-color: #2B2B2B;
@@ -1332,6 +1166,7 @@ Thank you for your purchase!
                     border-radius: 4px;
                     padding: 8px 16px;
                     font-weight: bold;
+                    transition: all 0.1s;
                 }
                 QPushButton:hover {
                     background-color: #F8F8F8;
@@ -1340,6 +1175,7 @@ Thank you for your purchase!
                 }
                 QPushButton:pressed {
                     background-color: #B3B3B3;
+                    transform: scale(0.97);
                 }
                 QPushButton:disabled {
                     background-color: #F8F8F8;
@@ -1347,36 +1183,40 @@ Thank you for your purchase!
                 }
             """
 
-    def apply_theme_to_buttons(self, parent_widget):
-        """Recursively apply the theme-based button stylesheet to all QPushButton widgets in the given parent widget."""
+    def apply_theme_to_buttons(self, parent_widget: QWidget) -> None:
+        """
+        Recursively apply the theme-based button stylesheet to all QPushButton widgets in the given parent widget.
+        :param parent_widget: Parent widget to apply styles to
+        """
         for child in parent_widget.findChildren(QPushButton):
             # Skip navbar buttons (they have their own style)
             if hasattr(self, "nav_buttons") and child in self.nav_buttons:
                 continue
             child.setStyleSheet(self.get_button_stylesheet())
 
-    def open_billing_add_medicine_dialog(self):
+    def open_billing_add_medicine_dialog(self) -> None:
         dialog = BillingAddMedicineDialog(self)
         if dialog.exec_() == dialog.Accepted:
             medicine, quantity = dialog.get_selected()
             if medicine and quantity:
                 self._add_billing_item_manual(medicine, quantity)
 
-    def _add_billing_item_manual(self, medicine, quantity):
+    def _add_billing_item_manual(self, medicine: dict, quantity: int) -> None:
         # Add the selected medicine to the billing table manually
         row = self.billing_table.rowCount()
         self.billing_table.insertRow(row)
-        self.billing_table.setItem(row, 0, QTableWidgetItem(medicine.barcode))
-        self.billing_table.setItem(row, 1, QTableWidgetItem(medicine.name))
+        self.billing_table.setItem(row, 0, QTableWidgetItem(medicine.get('barcode', '')))
+        self.billing_table.setItem(row, 1, QTableWidgetItem(medicine.get('name', '')))
         self.billing_table.setItem(row, 2, QTableWidgetItem(str(quantity)))
-        self.billing_table.setItem(
-            row, 3, QTableWidgetItem(f"₹{getattr(medicine, 'price', 0)}")
-        )
+        self.billing_table.setItem(row, 3, QTableWidgetItem(f"₹{getattr(medicine, 'price', 0)}"))
+        self.billing_table.setItem(row, 4, QTableWidgetItem("0"))  # Tax
+        self.billing_table.setItem(row, 5, QTableWidgetItem("0"))  # Discount
+        self.billing_table.setItem(row, 6, QTableWidgetItem(f"₹{getattr(medicine, 'price', 0)}"))
         total = getattr(medicine, "price", 0) * quantity
-        self.billing_table.setItem(row, 4, QTableWidgetItem(f"₹{total:.2f}"))
+        self.billing_table.setItem(row, 6, QTableWidgetItem(f"₹{total:.2f}"))
         self._refresh_billing_table()
 
-    def handle_exit(self):
+    def handle_exit(self) -> None:
         # Check for unsaved data in all modules
         unsaved = []
         # Billing: unsaved items in billing table
@@ -1411,7 +1251,7 @@ Thank you for your purchase!
         self.save_all_data()
         QApplication.quit()
 
-    def save_all_data(self):
+    def save_all_data(self) -> None:
         # Billing: Save or discard unsaved billing items
         if hasattr(self, "billing_table") and self.billing_table.rowCount() > 0:
             self.save_billing_draft()
@@ -1433,61 +1273,65 @@ Thank you for your purchase!
             self.save_settings_changes()
             self.settings_edit_in_progress = False
 
-    def save_billing_draft(self):
-        # Save billing table as a draft bill to a JSON file
-        if hasattr(self, "billing_table"):
-            draft = []
-            for row in range(self.billing_table.rowCount()):
-                item = {
-                    "barcode": (
-                        self.billing_table.item(row, 0).text()
-                        if self.billing_table.item(row, 0)
-                        else ""
-                    ),
-                    "name": (
-                        self.billing_table.item(row, 1).text()
-                        if self.billing_table.item(row, 1)
-                        else ""
-                    ),
-                    "quantity": (
-                        self.billing_table.item(row, 2).text()
-                        if self.billing_table.item(row, 2)
-                        else ""
-                    ),
-                    "price": (
-                        self.billing_table.item(row, 3).text()
-                        if self.billing_table.item(row, 3)
-                        else ""
-                    ),
-                    "total": (
-                        self.billing_table.item(row, 4).text()
-                        if self.billing_table.item(row, 4)
-                        else ""
-                    ),
-                }
-                draft.append(item)
-            try:
-                with open("billing_draft.json", "w", encoding="utf-8") as f:
-                    json.dump(draft, f, ensure_ascii=False, indent=2)
-                QMessageBox.information(
-                    self,
-                    "Draft Saved",
-                    "Billing items have been saved as a draft bill (billing_draft.json).",
-                )
-            except Exception as e:
-                QMessageBox.warning(
-                    self, "Draft Save Failed", f"Failed to save draft: {str(e)}"
-                )
+    def save_billing_draft(self) -> None:
+        """
+        Save the current bill as a draft to a local JSON file (multiple drafts supported, custom name).
+        """
+        import json, os, datetime
+        from PyQt5.QtWidgets import QInputDialog, QMessageBox
+        if not os.path.exists('drafts'):
+            os.makedirs('drafts')
+        # Prompt for custom name
+        name, ok = QInputDialog.getText(self, "Draft Name", "Enter a name for this draft:")
+        if not ok or not name.strip():
+            QMessageBox.warning(self, "No Name", "Draft not saved: name is required.")
+            return
+        safe_name = "_".join(name.strip().split())
+        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+        draft_filename = f'drafts/draft_bill_{safe_name}_{timestamp}.json'
+        draft = {
+            'customer': {
+                'name': self.customer_name.text(),
+                'age': self.customer_age.value(),
+                'gender': self.customer_gender.currentText(),
+                'phone': self.customer_phone.text(),
+                'email': self.customer_email.text(),
+                'address': self.customer_address.text(),
+            },
+            'items': []
+        }
+        for row in range(self.billing_table.rowCount()):
+            item = {
+                'barcode': self.billing_table.item(row, 0).text() if self.billing_table.item(row, 0) else '',
+                'name': self.billing_table.item(row, 1).text() if self.billing_table.item(row, 1) else '',
+                'quantity': self.billing_table.item(row, 2).text() if self.billing_table.item(row, 2) else '',
+                'price': self.billing_table.item(row, 3).text() if self.billing_table.item(row, 3) else '',
+                'tax': self.billing_table.item(row, 4).text() if self.billing_table.item(row, 4) else '',
+                'discount': self.billing_table.item(row, 5).text() if self.billing_table.item(row, 5) else '',
+            }
+            draft['items'].append(item)
+        try:
+            with open(draft_filename, 'w', encoding='utf-8') as f:
+                json.dump(draft, f, ensure_ascii=False, indent=2)
+            QMessageBox.information(self, "Draft Saved", f"Current bill has been saved as a draft: {draft_filename}")
+            self._refresh_billing_history()
+        except Exception as e:
+            logger.error(f"Failed to save draft {draft_filename}: {e}")
+            QMessageBox.warning(self, "Draft Error", f"Could not save draft: {e}")
 
-    def clear_billing_table(self):
+    def clear_billing_table(self) -> None:
         # Clear the billing table
         if hasattr(self, "billing_table"):
             self.billing_table.setRowCount(0)
         # Optionally remove the draft file
         if os.path.exists("billing_draft.json"):
-            os.remove("billing_draft.json")
+            try:
+                os.remove("billing_draft.json")
+            except Exception as e:
+                logger.error(f"Failed to delete billing_draft.json: {e}")
+                QMessageBox.warning(self, "Delete Error", f"Could not delete billing draft: {e}")
 
-    def save_inventory_edits(self):
+    def save_inventory_edits(self) -> None:
         # Call inventory model/controller save method if present
         if hasattr(self, "inventory_model") and hasattr(
             self.inventory_model, "save_changes"
@@ -1498,7 +1342,7 @@ Thank you for your purchase!
             self, "Inventory Saved", "Inventory edits have been saved."
         )
 
-    def discard_inventory_edits(self):
+    def discard_inventory_edits(self) -> None:
         # Call inventory model/controller discard method if present
         if hasattr(self, "inventory_model") and hasattr(
             self.inventory_model, "discard_changes"
@@ -1509,14 +1353,14 @@ Thank you for your purchase!
             self, "Inventory Discarded", "Inventory edits have been discarded."
         )
 
-    def save_order_edits(self):
+    def save_order_edits(self) -> None:
         # Call order model/controller save method if present
         if hasattr(self, "order_model") and hasattr(self.order_model, "save_changes"):
             self.order_model.save_changes()
         self.order_edit_in_progress = False
         QMessageBox.information(self, "Orders Saved", "Order edits have been saved.")
 
-    def discard_order_edits(self):
+    def discard_order_edits(self) -> None:
         # Call order model/controller discard method if present
         if hasattr(self, "order_model") and hasattr(
             self.order_model, "discard_changes"
@@ -1527,7 +1371,7 @@ Thank you for your purchase!
             self, "Orders Discarded", "Order edits have been discarded."
         )
 
-    def save_settings_changes(self):
+    def save_settings_changes(self) -> None:
         # Call settings model/controller save method if present
         if hasattr(self, "settings_model") and hasattr(
             self.settings_model, "save_changes"
@@ -1538,7 +1382,7 @@ Thank you for your purchase!
             self, "Settings Saved", "Settings changes have been saved."
         )
 
-    def discard_settings_changes(self):
+    def discard_settings_changes(self) -> None:
         # Call settings model/controller discard method if present
         if hasattr(self, "settings_model") and hasattr(
             self.settings_model, "discard_changes"
@@ -1549,7 +1393,7 @@ Thank you for your purchase!
             self, "Settings Discarded", "Settings changes have been discarded."
         )
 
-    def show_license_info_dialog(self):
+    def show_license_info_dialog(self) -> None:
         from PyQt5.QtWidgets import (
             QDialog,
             QLabel,
@@ -1558,13 +1402,13 @@ Thank you for your purchase!
             QVBoxLayout,
         )
 
-        key = get_license_key()
+        key = self.settings_service.get_license_key()
         if not key:
             QMessageBox.warning(self, "No License", "No license key found.")
             return
         if key == "TRIAL-000000000000":
             name = "Trial User"
-            install_date = get_installation_date()
+            install_date = self.settings_service.get_installation_date()
             if install_date:
                 install_dt = datetime.datetime.strptime(install_date, "%Y-%m-%d")
                 days_used = (datetime.datetime.now() - install_dt).days
@@ -1609,9 +1453,10 @@ Thank you for your purchase!
         dialog.exec_()
 
     @staticmethod
-    def check_license():
-        key = get_license_key()
-        install_date = get_installation_date()
+    def check_license() -> bool:
+        settings_service = SettingsService()
+        key = settings_service.get_license_key()
+        install_date = settings_service.get_installation_date()
         if not key or not install_date:
             return False
         # Trial license logic
@@ -1663,7 +1508,7 @@ Thank you for your purchase!
         return True
 
     @staticmethod
-    def prompt_license_dialog(parent=None):
+    def prompt_license_dialog(parent=None) -> None:
         import sys
 
         from PyQt5.QtWidgets import (
@@ -1699,9 +1544,10 @@ Thank you for your purchase!
             def try_activate():
                 key = key_input.text().strip()
                 if key == "TRIAL-000000000000":
-                    set_license_key(key)
-                    if not get_installation_date():
-                        set_installation_date(
+                    settings_service = SettingsService()
+                    settings_service.set_license_key(key)
+                    if not settings_service.get_installation_date():
+                        settings_service.set_installation_date(
                             datetime.datetime.now().strftime("%Y-%m-%d")
                         )
                     dialog.accept()
@@ -1713,9 +1559,9 @@ Thank you for your purchase!
                         dialog, "Invalid License", f"License error: {err}"
                     )
                     return
-                set_license_key(key)
-                if not get_installation_date():
-                    set_installation_date(datetime.datetime.now().strftime("%Y-%m-%d"))
+                settings_service.set_license_key(key)
+                if not settings_service.get_installation_date():
+                    settings_service.set_installation_date(datetime.datetime.now().strftime("%Y-%m-%d"))
                 dialog.accept()
 
             def quit_app():
@@ -1738,7 +1584,7 @@ Thank you for your purchase!
                 sys.exit(0)
             # If dialog closed in any other way, re-show dialog
 
-    def delete_selected_inventory_row(self):
+    def delete_selected_inventory_row(self) -> None:
         selected = self.inventory_table.currentRow()
         if selected < 0:
             QMessageBox.warning(self, "No Selection", "Please select a row to delete.")
@@ -1751,18 +1597,23 @@ Thank you for your purchase!
             QMessageBox.Yes | QMessageBox.No,
         )
         if reply == QMessageBox.Yes:
-            success, error = delete_medicine(barcode)
+            success, error = self.inventory_service.delete(barcode)
             if success:
                 QMessageBox.information(
                     self, "Deleted", "Medicine deleted successfully."
                 )
                 self.refresh_inventory_table()
+                # Refresh open dialogs if present
+                if self.bulk_threshold_dialog is not None:
+                    self.bulk_threshold_dialog.reload_data()
+                if self.quick_add_stock_dialog is not None:
+                    self.quick_add_stock_dialog.reload_data()
             else:
                 QMessageBox.critical(
                     self, "Error", f"Failed to delete medicine: {error}"
                 )
 
-    def clear_inventory(self):
+    def clear_inventory(self) -> None:
         reply = QMessageBox.question(
             self,
             "Clear Inventory",
@@ -1770,7 +1621,7 @@ Thank you for your purchase!
             QMessageBox.Yes | QMessageBox.No,
         )
         if reply == QMessageBox.Yes:
-            success, result = clear_inventory()
+            success, result = self.inventory_service.clear()
             if success:
                 QMessageBox.information(
                     self,
@@ -1778,12 +1629,17 @@ Thank you for your purchase!
                     f"All medicines deleted. ({result} items removed)",
                 )
                 self.refresh_inventory_table()
+                # Refresh open dialogs if present
+                if self.bulk_threshold_dialog is not None:
+                    self.bulk_threshold_dialog.reload_data()
+                if self.quick_add_stock_dialog is not None:
+                    self.quick_add_stock_dialog.reload_data()
             else:
                 QMessageBox.critical(
                     self, "Error", f"Failed to clear inventory: {result}"
                 )
 
-    def send_daily_sales_summary(self):
+    def send_daily_sales_summary(self) -> None:
         import datetime
 
         from db import Bill
@@ -1831,3 +1687,50 @@ Thank you for your purchase!
         finally:
             if session:
                 session.close()
+
+    def clear_billing_history(self) -> None:
+        """
+        Clear all recent bills from the history (does not delete drafts).
+        """
+        from PyQt5.QtWidgets import QMessageBox
+        reply = QMessageBox.question(self, "Clear History", "Are you sure you want to clear all recent bills? This cannot be undone.", QMessageBox.Yes | QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            # Assuming get_all_bills() returns a list of bill objects and you have a function to delete bills
+            clear_all_bills()
+            self._refresh_billing_history()
+            QMessageBox.information(self, "History Cleared", "All recent bills have been cleared.")
+
+    def delete_selected_draft(self) -> None:
+        """
+        Delete the selected draft file from the drafts directory.
+        """
+        from PyQt5.QtWidgets import QMessageBox
+        selected_items = self.billing_history_list.selectedItems()
+        if not selected_items:
+            QMessageBox.warning(self, "No Selection", "Please select a draft to delete.")
+            return
+        selected_item = selected_items[0]
+        data = selected_item.data(Qt.UserRole)
+        if not (isinstance(data, dict) and data.get('is_draft') and data.get('draft_path')):
+            QMessageBox.warning(self, "Not a Draft", "Please select a draft bill to delete.")
+            return
+        import os
+        try:
+            os.remove(data['draft_path'])
+            QMessageBox.information(self, "Draft Deleted", "Draft has been deleted.")
+            self._refresh_billing_history()
+        except Exception as e:
+            QMessageBox.warning(self, "Delete Failed", f"Could not delete draft: {e}")
+
+    @property
+    def inventory_table(self):
+        """
+        Property to access the inventory table widget for compatibility with tests and legacy code.
+        """
+        return self.inventory_ui.inventory_table
+
+    def refresh_billing_history(self):
+        """
+        Public method to refresh billing history, for use by BillingUi and tests.
+        """
+        self._refresh_billing_history()

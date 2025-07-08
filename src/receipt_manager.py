@@ -17,7 +17,7 @@ from reportlab.lib.units import inch
 from reportlab.pdfgen import canvas
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-log_dir = os.path.join(os.getcwd(), "logs")
+log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
 if not os.path.exists(log_dir):
     os.makedirs(log_dir)
 log_file = os.path.join(log_dir, "medibit_app.log")
@@ -31,7 +31,11 @@ receipt_logger = logging.getLogger("medibit.receipt")
 
 class ReceiptManager:
     def __init__(self):
-        self.config_file = "notification_config.json"
+        # Set config directory at project root
+        config_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config")
+        if not os.path.exists(config_dir):
+            os.makedirs(config_dir)
+        self.config_file = os.path.join(config_dir, "notification_config.json")
         self.load_config()
 
     def load_config(self):
@@ -40,11 +44,12 @@ class ReceiptManager:
             try:
                 with open(self.config_file, "r") as f:
                     self.config = json.load(f)
-            except:
-                self.config = {
-                    "email": {"enabled": False},
-                    "whatsapp": {"enabled": False},
-                }
+            except json.JSONDecodeError as e:
+                receipt_logger.error(f"Failed to decode receipt config JSON: {e}")
+                self.config = {"email": {"enabled": False}, "whatsapp": {"enabled": False}}
+            except Exception as e:
+                receipt_logger.error(f"Failed to read receipt config: {e}")
+                self.config = {"email": {"enabled": False}, "whatsapp": {"enabled": False}}
         else:
             self.config = {"email": {"enabled": False}, "whatsapp": {"enabled": False}}
 
@@ -52,7 +57,7 @@ class ReceiptManager:
         """Generate a professional PDF receipt"""
 
         # Create receipts directory
-        receipts_dir = os.path.join(os.getcwd(), "receipts")
+        receipts_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "receipts")
         os.makedirs(receipts_dir, exist_ok=True)
 
         # Fix filename construction for datetime
@@ -274,16 +279,19 @@ class ReceiptManager:
             msg.attach(MIMEText(body, "plain"))
 
             # Attach PDF
-            with open(pdf_path, "rb") as attachment:
-                part = MIMEBase("application", "octet-stream")
-                part.set_payload(attachment.read())
-
-            encoders.encode_base64(part)
-            part.add_header(
-                "Content-Disposition",
-                f"attachment; filename= {os.path.basename(pdf_path)}",
-            )
-            msg.attach(part)
+            try:
+                with open(pdf_path, "rb") as attachment:
+                    part = MIMEBase("application", "octet-stream")
+                    part.set_payload(attachment.read())
+                encoders.encode_base64(part)
+                part.add_header(
+                    "Content-Disposition",
+                    f"attachment; filename=receipt_{customer_info.get('name', 'customer')}.pdf",
+                )
+                msg.attach(part)
+            except Exception as e:
+                receipt_logger.error(f"Failed to attach PDF to receipt email: {e}")
+                return False, f"Failed to attach PDF: {e}"
 
             # Send email
             server = smtplib.SMTP(

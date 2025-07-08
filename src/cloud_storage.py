@@ -17,7 +17,9 @@ class CloudStorage:
             try:
                 with open(self.config_file, "r") as f:
                     self.config = json.load(f)
-            except:
+            except json.JSONDecodeError as e:
+                self.create_default_config()
+            except Exception as e:
                 self.create_default_config()
         else:
             self.create_default_config()
@@ -35,10 +37,13 @@ class CloudStorage:
 
     def save_config(self):
         """Save configuration to file"""
-        with open(self.config_file, "w") as f:
-            json.dump(self.config, f, indent=4)
+        try:
+            with open(self.config_file, "w") as f:
+                json.dump(self.config, f, indent=4)
+        except Exception as e:
+            print(f"Failed to save cloud storage config: {e}")
 
-    def upload_pdf(self, pdf_path):
+    def upload_pdf(self, pdf_path: str) -> tuple[str | None, str]:
         """Upload PDF to cloud storage and return public URL"""
         if not self.config["enabled"]:
             return None, "Cloud storage is disabled"
@@ -53,7 +58,7 @@ class CloudStorage:
         except Exception as e:
             return None, f"Upload failed: {str(e)}"
 
-    def _upload_to_imgur(self, pdf_path):
+    def _upload_to_imgur(self, pdf_path: str) -> tuple[str | None, str]:
         """Upload to Imgur (free tier)"""
         try:
             # Note: Imgur doesn't support PDF uploads in free tier
@@ -62,7 +67,7 @@ class CloudStorage:
         except Exception as e:
             return None, f"Imgur upload failed: {str(e)}"
 
-    def _upload_to_custom(self, pdf_path):
+    def _upload_to_custom(self, pdf_path: str) -> tuple[str | None, str]:
         """Upload to custom service"""
         try:
             if not self.config["upload_url"]:
@@ -93,10 +98,10 @@ class LocalFileServer:
 
     def __init__(self):
         self.base_url = "http://localhost:8000"
-        self.files_dir = os.path.join(os.getcwd(), "public_files")
+        self.files_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "public_files")
         os.makedirs(self.files_dir, exist_ok=True)
 
-    def serve_file(self, file_path):
+    def serve_file(self, file_path: str) -> tuple[str | None, str]:
         """Create a local file server for the PDF"""
         try:
             # Copy file to public directory
@@ -112,7 +117,7 @@ class LocalFileServer:
             return None, f"Local serving failed: {str(e)}"
 
 
-def get_pdf_url(pdf_path):
+def get_pdf_url(pdf_path: str) -> tuple[str, str]:
     """Get a publicly accessible URL for the PDF"""
     cloud_storage = CloudStorage()
 

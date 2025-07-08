@@ -20,6 +20,7 @@ from PyQt5.QtWidgets import (
     QTextEdit,
     QVBoxLayout,
     QWidget,
+    QStyledItemDelegate,
 )
 
 from config import get_threshold
@@ -82,6 +83,12 @@ class AddMedicineDialog(QDialog):
         self.buttonBox.clicked.connect(self.check_and_add)
         layout.addRow(self.buttonBox)
 
+        # Dialog-level validation
+        self.buttonBox.setEnabled(False)
+        self.barcode.textChanged.connect(self.validate)
+        self.name.textChanged.connect(self.validate)
+        self.validate()
+
     def check_and_add(self):
         """Check if barcode exists and confirm before adding"""
         barcode = self.barcode.text().strip()
@@ -123,6 +130,10 @@ class AddMedicineDialog(QDialog):
             "price": self.price.value(),
         }
 
+    def validate(self):
+        valid = bool(self.barcode.text().strip() and self.name.text().strip())
+        self.buttonBox.setEnabled(valid)
+
 
 class OrderQuantityDialog(QDialog):
     def __init__(self, medicines, parent=None):
@@ -139,15 +150,22 @@ class OrderQuantityDialog(QDialog):
             spin.setValue(10)
             self.spins[med.barcode] = spin
             layout.addRow(f"{med.name} (Current: {med.quantity})", spin)
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        button_box.setMinimumHeight(40)  # Set height
-        button_box.setMaximumHeight(50)  # Set maximum height
-        button_box.accepted.connect(self.accept)
-        button_box.rejected.connect(self.reject)
-        layout.addRow(button_box)
+        self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.button_box.setMinimumHeight(40)  # Set height
+        self.button_box.setMaximumHeight(50)  # Set maximum height
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+        layout.addRow(self.button_box)
+        for spin in self.spins.values():
+            spin.valueChanged.connect(self.validate)
+        self.validate()
 
     def get_order_quantities(self):
         return {barcode: spin.value() for barcode, spin in self.spins.items()}
+
+    def validate(self):
+        valid = any(spin.value() > 0 for spin in self.spins.values())
+        self.button_box.button(QDialogButtonBox.Ok).setEnabled(valid)
 
 
 class NotificationSettingsDialog(QDialog):
@@ -302,19 +320,34 @@ class NotificationSettingsDialog(QDialog):
 
         # Buttons
         button_layout = QHBoxLayout()
-        save_btn = QPushButton("Save Settings")
-        test_btn = QPushButton("Test Notifications")
-        cancel_btn = QPushButton("Cancel")
+        self.save_btn = QPushButton("Save Settings")
+        self.test_btn = QPushButton("Test Notifications")
+        self.cancel_btn = QPushButton("Cancel")
 
-        save_btn.clicked.connect(self.save_settings)
-        test_btn.clicked.connect(self.test_notifications)
-        cancel_btn.clicked.connect(self.reject)
+        self.save_btn.clicked.connect(self.save_settings)
+        self.test_btn.clicked.connect(self.test_notifications)
+        self.cancel_btn.clicked.connect(self.reject)
 
-        button_layout.addWidget(save_btn)
-        button_layout.addWidget(test_btn)
+        button_layout.addWidget(self.save_btn)
+        button_layout.addWidget(self.test_btn)
         button_layout.addStretch()
-        button_layout.addWidget(cancel_btn)
+        button_layout.addWidget(self.cancel_btn)
         layout.addLayout(button_layout)
+
+        # Dialog-level validation
+        self.email_enabled.toggled.connect(self.validate)
+        self.smtp_server.textChanged.connect(self.validate)
+        self.smtp_port.valueChanged.connect(self.validate)
+        self.sender_email.textChanged.connect(self.validate)
+        self.sender_password.textChanged.connect(self.validate)
+        self.recipient_emails.textChanged.connect(self.validate)
+        self.whatsapp_enabled.toggled.connect(self.validate)
+        self.whatsapp_api_key.textChanged.connect(self.validate)
+        self.whatsapp_phone_numbers.textChanged.connect(self.validate)
+        self.sms_enabled.toggled.connect(self.validate)
+        self.sms_api_key.textChanged.connect(self.validate)
+        self.sms_phone_numbers.textChanged.connect(self.validate)
+        self.validate()
 
     def save_settings(self):
         """Save notification settings"""
@@ -383,7 +416,8 @@ class NotificationSettingsDialog(QDialog):
             self.accept()
 
         except Exception as e:
-            QMessageBox.warning(self, "Error", f"Failed to save settings: {str(e)}")
+            parent = self.parent() if self.parent() is not None else None
+            QMessageBox.warning(parent, "Error", f"Failed to save settings: {str(e)}")
 
     def test_notifications(self):
         """Test notification settings"""
@@ -411,6 +445,31 @@ class NotificationSettingsDialog(QDialog):
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Test failed: {str(e)}")
 
+    def validate(self):
+        valid = True
+        # Email validation
+        if self.email_enabled.isChecked():
+            valid = valid and all([
+                self.smtp_server.text().strip(),
+                self.smtp_port.value() > 0,
+                self.sender_email.text().strip(),
+                self.sender_password.text().strip(),
+                self.recipient_emails.text().strip()
+            ])
+        # WhatsApp validation
+        if self.whatsapp_enabled.isChecked():
+            valid = valid and all([
+                self.whatsapp_api_key.text().strip(),
+                self.whatsapp_phone_numbers.text().strip()
+            ])
+        # SMS validation
+        if self.sms_enabled.isChecked():
+            valid = valid and all([
+                self.sms_api_key.text().strip(),
+                self.sms_phone_numbers.text().strip()
+            ])
+        self.save_btn.setEnabled(valid)
+
 
 class CustomerInfoDialog(QDialog):
     def __init__(self, parent=None):
@@ -427,10 +486,12 @@ class CustomerInfoDialog(QDialog):
         layout.addRow("Name:", self.name)
         layout.addRow("Phone:", self.phone)
         layout.addRow("Email:", self.email)
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        button_box.accepted.connect(self.accept)
-        button_box.rejected.connect(self.reject)
-        layout.addRow(button_box)
+        self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+        layout.addRow(self.button_box)
+        self.name.textChanged.connect(self.validate)
+        self.validate()
 
     def get_data(self):
         return {
@@ -438,6 +499,10 @@ class CustomerInfoDialog(QDialog):
             "phone": self.phone.text().strip(),
             "email": self.email.text().strip(),
         }
+
+    def validate(self):
+        valid = bool(self.name.text().strip())
+        self.button_box.button(QDialogButtonBox.Ok).setEnabled(valid)
 
 
 class SupplierInfoDialog(QDialog):
@@ -455,10 +520,12 @@ class SupplierInfoDialog(QDialog):
         layout.addRow("Name:", self.name)
         layout.addRow("Phone:", self.phone)
         layout.addRow("Email:", self.email)
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        button_box.accepted.connect(self.accept)
-        button_box.rejected.connect(self.reject)
-        layout.addRow(button_box)
+        self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+        layout.addRow(self.button_box)
+        self.name.textChanged.connect(self.validate)
+        self.validate()
 
     def get_data(self):
         return {
@@ -466,6 +533,10 @@ class SupplierInfoDialog(QDialog):
             "phone": self.phone.text().strip(),
             "email": self.email.text().strip(),
         }
+
+    def validate(self):
+        valid = bool(self.name.text().strip())
+        self.button_box.button(QDialogButtonBox.Ok).setEnabled(valid)
 
 
 class ThresholdSettingDialog(QDialog):
@@ -521,16 +592,19 @@ class ThresholdSettingDialog(QDialog):
 
         # Buttons
         button_layout = QHBoxLayout()
-        save_btn = QPushButton("Save Threshold")
-        cancel_btn = QPushButton("Cancel")
+        self.save_btn = QPushButton("Save Threshold")
+        self.cancel_btn = QPushButton("Cancel")
 
-        save_btn.clicked.connect(self.save_threshold)
-        cancel_btn.clicked.connect(self.reject)
+        self.save_btn.clicked.connect(self.save_threshold)
+        self.cancel_btn.clicked.connect(self.reject)
 
-        button_layout.addWidget(save_btn)
+        button_layout.addWidget(self.save_btn)
         button_layout.addStretch()
-        button_layout.addWidget(cancel_btn)
+        button_layout.addWidget(self.cancel_btn)
         layout.addLayout(button_layout)
+
+        self.threshold_spinbox.valueChanged.connect(self.validate)
+        self.validate()
 
     def save_threshold(self):
         try:
@@ -553,6 +627,29 @@ class ThresholdSettingDialog(QDialog):
 
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to update threshold: {str(e)}")
+
+    def validate(self):
+        valid = self.threshold_spinbox.value() > 0
+        self.save_btn.setEnabled(valid)
+
+
+class SpinBoxDelegate(QStyledItemDelegate):
+    def createEditor(self, parent, option, index):
+        editor = QSpinBox(parent)
+        editor.setMinimum(0)
+        editor.setMaximum(10000)
+        return editor
+
+    def setEditorData(self, editor, index):
+        value = index.model().data(index, Qt.EditRole)
+        try:
+            value = int(value)
+        except (TypeError, ValueError):
+            value = 0
+        editor.setValue(value)
+
+    def setModelData(self, editor, model, index):
+        model.setData(index, editor.value(), Qt.EditRole)
 
 
 class BulkThresholdDialog(QDialog):
@@ -622,23 +719,30 @@ class BulkThresholdDialog(QDialog):
         self.table.setColumnWidth(2, 120)  # Current threshold
         self.table.setColumnWidth(3, 120)  # New threshold
 
+        # Set QSpinBox delegate for 'New Threshold' column
+        self.table.setItemDelegateForColumn(3, SpinBoxDelegate(self.table))
+
         layout.addWidget(self.table)
 
         # Buttons
         button_layout = QHBoxLayout()
-        save_btn = QPushButton("Save All Thresholds")
-        cancel_btn = QPushButton("Cancel")
+        self.save_btn = QPushButton("Save All Thresholds")
+        self.cancel_btn = QPushButton("Cancel")
 
-        save_btn.clicked.connect(self.save_all_thresholds)
-        cancel_btn.clicked.connect(self.reject)
+        self.save_btn.clicked.connect(self.save_all_thresholds)
+        self.cancel_btn.clicked.connect(self.reject)
 
-        button_layout.addWidget(save_btn)
+        button_layout.addWidget(self.save_btn)
         button_layout.addStretch()
-        button_layout.addWidget(cancel_btn)
+        button_layout.addWidget(self.cancel_btn)
         layout.addLayout(button_layout)
 
     def save_all_thresholds(self):
         """Save all threshold changes"""
+        # Commit any active cell editor to ensure value is saved
+        self.table.setCurrentCell(-1, -1)
+        self.table.clearFocus()
+        self.setFocus()
         try:
             updated_count = 0
             errors = []
@@ -652,13 +756,16 @@ class BulkThresholdDialog(QDialog):
                             errors.append(f"{med.name}: Threshold must be 0 or greater")
                             continue
 
-                        success, error = update_medicine_threshold(
-                            med.barcode, new_threshold
-                        )
-                        if success:
-                            updated_count += 1
-                        else:
-                            errors.append(f"{med.name}: {error}")
+                        # Only update if the threshold has changed
+                        if new_threshold != getattr(med, "threshold", 10):
+                            success, error = update_medicine_threshold(
+                                med.barcode, new_threshold
+                            )
+                            if success:
+                                updated_count += 1
+                            else:
+                                errors.append(f"{med.name}: {error}")
+                        # If not changed, do not increment updated_count
                     except ValueError:
                         errors.append(f"{med.name}: Invalid threshold value")
 
@@ -675,6 +782,12 @@ class BulkThresholdDialog(QDialog):
                     "Success",
                     f"Updated thresholds for {updated_count} medicines.",
                 )
+                # Robust: Walk up parent chain to find main window
+                parent = self.parent()
+                while parent and not hasattr(parent, 'refresh_inventory_table'):
+                    parent = parent.parent() if hasattr(parent, 'parent') else None
+                if parent and hasattr(parent, 'refresh_inventory_table'):
+                    parent.refresh_inventory_table()
                 self.accept()
             elif not errors:
                 QMessageBox.information(
@@ -683,6 +796,42 @@ class BulkThresholdDialog(QDialog):
 
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to update thresholds: {str(e)}")
+
+    def reload_data(self):
+        from db import get_all_medicines
+        self.medicines = get_all_medicines()
+        self.table.clearContents()
+        self.table.setRowCount(0)
+        for i, med in enumerate(self.medicines):
+            self.table.insertRow(i)
+            self.table.setItem(i, 0, QTableWidgetItem(f"{med.name} ({med.barcode})"))
+            self.table.item(i, 0).setFlags(self.table.item(i, 0).flags() & ~Qt.ItemIsEditable)
+            stock_item = QTableWidgetItem(str(med.quantity))
+            stock_item.setFlags(stock_item.flags() & ~Qt.ItemIsEditable)
+            if med.quantity < getattr(med, "threshold", 10):
+                stock_item.setBackground(QColor(255, 200, 200))
+            self.table.setItem(i, 1, stock_item)
+            current_threshold_item = QTableWidgetItem(str(getattr(med, "threshold", 10)))
+            current_threshold_item.setFlags(current_threshold_item.flags() & ~Qt.ItemIsEditable)
+            self.table.setItem(i, 2, current_threshold_item)
+            new_threshold_item = QTableWidgetItem(str(getattr(med, "threshold", 10)))
+            new_threshold_item.setFlags(new_threshold_item.flags() | Qt.ItemIsEditable)
+            self.table.setItem(i, 3, new_threshold_item)
+
+    def validate(self):
+        valid = True
+        any_changed = False
+        for i, med in enumerate(self.medicines):
+            item = self.table.item(i, 3)
+            try:
+                val = int(item.text())
+                if val < 0:
+                    valid = False
+                if val != getattr(med, "threshold", 10):
+                    any_changed = True
+            except Exception:
+                valid = False
+        self.save_btn.setEnabled(valid and any_changed)
 
 
 class EditMedicineDialog(QDialog):
@@ -748,16 +897,19 @@ class EditMedicineDialog(QDialog):
 
         # Buttons
         button_layout = QHBoxLayout()
-        save_btn = QPushButton("Save Changes")
-        cancel_btn = QPushButton("Cancel")
+        self.save_btn = QPushButton("Save Changes")
+        self.cancel_btn = QPushButton("Cancel")
 
-        save_btn.clicked.connect(self.save_changes)
-        cancel_btn.clicked.connect(self.reject)
+        self.save_btn.clicked.connect(self.save_changes)
+        self.cancel_btn.clicked.connect(self.reject)
 
-        button_layout.addWidget(save_btn)
+        button_layout.addWidget(self.save_btn)
         button_layout.addStretch()
-        button_layout.addWidget(cancel_btn)
+        button_layout.addWidget(self.cancel_btn)
         layout.addRow(button_layout)
+
+        self.name.textChanged.connect(self.validate)
+        self.validate()
 
     def save_changes(self):
         try:
@@ -803,6 +955,10 @@ class EditMedicineDialog(QDialog):
 
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to update medicine: {str(e)}")
+
+    def validate(self):
+        valid = bool(self.name.text().strip())
+        self.save_btn.setEnabled(valid)
 
 
 class PharmacyDetailsDialog(QDialog):
@@ -880,11 +1036,11 @@ class PharmacyDetailsDialog(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
-        save_btn = QPushButton("Save Details")
-        save_btn.setMinimumHeight(40)
-        save_btn.setMinimumWidth(120)
-        save_btn.clicked.connect(self.save_details)
-        button_layout.addWidget(save_btn)
+        self.save_btn = QPushButton("Save Details")
+        self.save_btn.setMinimumHeight(40)
+        self.save_btn.setMinimumWidth(120)
+        self.save_btn.clicked.connect(self.save_details)
+        button_layout.addWidget(self.save_btn)
 
         cancel_btn = QPushButton("Cancel")
         cancel_btn.setMinimumHeight(40)
@@ -894,9 +1050,14 @@ class PharmacyDetailsDialog(QDialog):
 
         layout.addLayout(button_layout)
 
+        self.name_edit.textChanged.connect(self.validate)
+        self.address_edit.textChanged.connect(self.validate)
+        self.phone_edit.textChanged.connect(self.validate)
+        self.email_edit.textChanged.connect(self.validate)
+        self.validate()
+
     def load_existing_details(self):
         details = get_pharmacy_details()
-        print(f"Loading pharmacy details in dialog: {details}")
         if details:
             self.name_edit.setText(details.name)
             self.address_edit.setPlainText(details.address)
@@ -905,11 +1066,6 @@ class PharmacyDetailsDialog(QDialog):
             self.gst_edit.setText(details.gst_number or "")
             self.license_edit.setText(details.license_number or "")
             self.website_edit.setText(details.website or "")
-            print(
-                f"Loaded pharmacy details: {details.name}, {details.address}, {details.phone}, {details.email}"
-            )
-        else:
-            print("No pharmacy details found, form will be empty")
 
     def save_details(self):
         name = self.name_edit.text().strip()
@@ -935,20 +1091,26 @@ class PharmacyDetailsDialog(QDialog):
             return
 
         # Save to database
-        print(f"Saving pharmacy details: {name}, {address}, {phone}, {email}")
         success, message = save_pharmacy_details(
             name, address, phone, email, gst_number, license_number, website
         )
 
         if success:
-            print(f"Successfully saved pharmacy details: {message}")
             QMessageBox.information(self, "Success", message)
             self.accept()
         else:
-            print(f"Failed to save pharmacy details: {message}")
             QMessageBox.critical(
                 self, "Error", f"Failed to save pharmacy details: {message}"
             )
+
+    def validate(self):
+        valid = bool(
+            self.name_edit.text().strip() and
+            self.address_edit.toPlainText().strip() and
+            self.phone_edit.text().strip() and
+            self.email_edit.text().strip()
+        )
+        self.save_btn.setEnabled(valid)
 
 
 class QuickAddStockDialog(QDialog):
@@ -1084,6 +1246,12 @@ class QuickAddStockDialog(QDialog):
                 QMessageBox.information(
                     self, "Success", f"Added stock to {updated_count} medicines."
                 )
+                # Robust: Walk up parent chain to find main window and refresh inventory table
+                parent = self.parent()
+                while parent and not hasattr(parent, 'refresh_inventory_table'):
+                    parent = parent.parent() if hasattr(parent, 'parent') else None
+                if parent and hasattr(parent, 'refresh_inventory_table'):
+                    parent.refresh_inventory_table()
                 self.accept()
             else:
                 QMessageBox.information(
@@ -1094,6 +1262,22 @@ class QuickAddStockDialog(QDialog):
 
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to add stock: {str(e)}")
+
+    def reload_data(self):
+        from db import get_all_medicines
+        self.medicines = get_all_medicines()
+        self.table.clearContents()
+        self.table.setRowCount(0)
+        for i, med in enumerate(self.medicines):
+            self.table.insertRow(i)
+            self.table.setItem(i, 0, QTableWidgetItem(f"{med.name} ({med.barcode})"))
+            self.table.item(i, 0).setFlags(self.table.item(i, 0).flags() & ~Qt.ItemIsEditable)
+            stock_item = QTableWidgetItem(str(med.quantity))
+            stock_item.setFlags(stock_item.flags() & ~Qt.ItemIsEditable)
+            self.table.setItem(i, 1, stock_item)
+            add_spin = QSpinBox()
+            add_spin.setRange(0, 10000)
+            self.table.setCellWidget(i, 2, add_spin)
 
 
 class BillingAddMedicineDialog(QDialog):
@@ -1148,6 +1332,12 @@ class BillingAddMedicineDialog(QDialog):
         self.medicines = get_all_medicines()
         self.populate_table(self.medicines)
 
+        # Dialog-level validation
+        self.add_btn.setEnabled(False)
+        self.table.itemSelectionChanged.connect(self.validate)
+        self.qty_spin.valueChanged.connect(self.validate)
+        self.validate()
+
     def populate_table(self, medicines):
         self.table.setRowCount(0)
         for med in medicines:
@@ -1178,3 +1368,8 @@ class BillingAddMedicineDialog(QDialog):
 
     def get_selected(self):
         return self.selected_medicine, self.selected_quantity
+
+    def validate(self):
+        selected = self.table.currentRow()
+        valid = selected >= 0 and self.qty_spin.value() >= 1
+        self.add_btn.setEnabled(valid)

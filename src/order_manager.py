@@ -17,7 +17,7 @@ from reportlab.lib.units import inch
 from reportlab.pdfgen import canvas
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-log_dir = os.path.join(os.getcwd(), "logs")
+log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
 if not os.path.exists(log_dir):
     os.makedirs(log_dir)
 log_file = os.path.join(log_dir, "medibit_app.log")
@@ -31,7 +31,11 @@ order_logger = logging.getLogger("medibit.order")
 
 class OrderManager:
     def __init__(self):
-        self.config_file = "notification_config.json"
+        # Set config directory at project root
+        config_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config")
+        if not os.path.exists(config_dir):
+            os.makedirs(config_dir)
+        self.config_file = os.path.join(config_dir, "notification_config.json")
         self.load_config()
 
     def load_config(self):
@@ -40,11 +44,12 @@ class OrderManager:
             try:
                 with open(self.config_file, "r") as f:
                     self.config = json.load(f)
-            except:
-                self.config = {
-                    "email": {"enabled": False},
-                    "whatsapp": {"enabled": False},
-                }
+            except json.JSONDecodeError as e:
+                order_logger.error(f"Failed to decode order config JSON: {e}")
+                self.config = {"email": {"enabled": False}, "whatsapp": {"enabled": False}}
+            except Exception as e:
+                order_logger.error(f"Failed to read order config: {e}")
+                self.config = {"email": {"enabled": False}, "whatsapp": {"enabled": False}}
         else:
             self.config = {"email": {"enabled": False}, "whatsapp": {"enabled": False}}
 
@@ -52,7 +57,7 @@ class OrderManager:
         """Generate a professional PDF order"""
 
         # Create orders directory
-        orders_dir = os.path.join(os.getcwd(), "orders")
+        orders_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "orders")
         os.makedirs(orders_dir, exist_ok=True)
 
         # Generate filename
@@ -69,9 +74,7 @@ class OrderManager:
             from db import get_pharmacy_details
 
             pharmacy_details = get_pharmacy_details()
-            print(f"Pharmacy details in order generation: {pharmacy_details}")
         except Exception as e:
-            print(f"Error getting pharmacy details in order: {e}")
             pharmacy_details = None
 
         # Title
@@ -358,16 +361,19 @@ class OrderManager:
             msg.attach(MIMEText(body, "plain"))
 
             # Attach PDF
-            with open(pdf_path, "rb") as attachment:
-                part = MIMEBase("application", "octet-stream")
-                part.set_payload(attachment.read())
-
-            encoders.encode_base64(part)
-            part.add_header(
-                "Content-Disposition",
-                f"attachment; filename= {os.path.basename(pdf_path)}",
-            )
-            msg.attach(part)
+            try:
+                with open(pdf_path, "rb") as attachment:
+                    part = MIMEBase("application", "octet-stream")
+                    part.set_payload(attachment.read())
+                encoders.encode_base64(part)
+                part.add_header(
+                    "Content-Disposition",
+                    f"attachment; filename=order_{order_id}.pdf",
+                )
+                msg.attach(part)
+            except Exception as e:
+                order_logger.error(f"Failed to attach PDF to order email: {e}")
+                return False, f"Failed to attach PDF: {e}"
 
             # Send email
             server = smtplib.SMTP(
