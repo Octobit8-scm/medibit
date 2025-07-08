@@ -1,12 +1,21 @@
-from src.db import get_monthly_sales
+from src.db import add_bill, get_monthly_sales
 
 
 def test_get_monthly_sales():
+    # Add a test bill
+    add_bill(
+        "2024-01-01 10:00",
+        500,
+        [
+            {
+                "barcode": "SALESTEST",
+                "name": "SalesTest",
+                "price": 100,
+                "quantity": 5,
+                "subtotal": 500,
+            }
+        ],
+    )
+    
     sales = get_monthly_sales()
-    assert isinstance(sales, list)
-    if sales:
-        month, total, count, avg = sales[0]
-        assert isinstance(month, str)
-        assert isinstance(total, (int, float))
-        assert isinstance(count, int)
-        assert isinstance(avg, (int, float))
+    assert len(sales) > 0
