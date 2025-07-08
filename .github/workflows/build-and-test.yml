@@ -87,7 +87,9 @@ jobs:
           python -m pytest --cov=src --cov-report=xml --cov-report=term tests/ --disable-warnings -v
 
       - name: Build EXE and Installer
-        run: ./build_installer.bat
+        shell: pwsh
+        run: |
+          .\build_installer.ps1
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
