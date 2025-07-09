@@ -53,7 +53,7 @@ class ReceiptManager:
         else:
             self.config = {"email": {"enabled": False}, "whatsapp": {"enabled": False}}
 
-    def generate_pdf_receipt(self, customer_info, items, total, timestamp, receipt_id):
+    def generate_pdf_receipt(self, customer_info, items, total, timestamp, receipt_id, pharmacy_details=None):
         """Generate a professional PDF receipt"""
 
         # Create receipts directory
@@ -65,13 +65,34 @@ class ReceiptManager:
             ts_str = timestamp.replace(":", "-").replace(" ", "_")
         else:
             ts_str = timestamp.strftime("%Y%m%d_%H%M%S")
-        filename = f"receipt_{receipt_id}_{ts_str}.pdf"
+        safe_name = "_".join(customer_info.get("name", "customer").strip().split())
+        filename = f"receipt_{safe_name}_id{receipt_id}_{ts_str}.pdf"
         filepath = os.path.join(receipts_dir, filename)
 
         # Create PDF document
         doc = SimpleDocTemplate(filepath, pagesize=A4)
         story = []
         styles = getSampleStyleSheet()
+
+        # Pharmacy Name/Address at the top
+        if pharmacy_details:
+            pharmacy_name = getattr(pharmacy_details, "name", "Pharmacy")
+            pharmacy_address = getattr(pharmacy_details, "address", "")
+            pharmacy_phone = getattr(pharmacy_details, "phone", "")
+            header_style = ParagraphStyle(
+                "Header",
+                parent=styles["Heading1"],
+                fontSize=18,
+                spaceAfter=6,
+                alignment=1,  # Center
+                textColor=colors.HexColor("#1976d2"),
+            )
+            story.append(Paragraph(pharmacy_name, header_style))
+            if pharmacy_address:
+                story.append(Paragraph(pharmacy_address, styles["Normal"]))
+            if pharmacy_phone:
+                story.append(Paragraph(f"Phone: {pharmacy_phone}", styles["Normal"]))
+            story.append(Spacer(1, 12))
 
         # Title
         title_style = ParagraphStyle(

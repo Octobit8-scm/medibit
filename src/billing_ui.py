@@ -17,8 +17,6 @@ class BillingUi(QWidget):
         layout.setSpacing(16)
         # --- Customer Information Section ---
         customer_info_frame = QFrame()
-        customer_info_frame.setFrameShape(QFrame.StyledPanel)
-        customer_info_frame.setStyleSheet("border: 1px solid #ccc; background: #fff;")
         customer_layout = QGridLayout(customer_info_frame)
         customer_layout.setContentsMargins(12, 12, 12, 12)
         customer_layout.setSpacing(10)
@@ -59,8 +57,6 @@ class BillingUi(QWidget):
         main_content_layout = QHBoxLayout()
         # Billing Table Section
         billing_table_frame = QFrame()
-        billing_table_frame.setFrameShape(QFrame.StyledPanel)
-        billing_table_frame.setStyleSheet("border: 1px solid #ccc; background: #fff;")
         billing_table_layout = QVBoxLayout(billing_table_frame)
         billing_table_title = QLabel("Billing Table")
         billing_table_title.setStyleSheet(self.get_section_title_stylesheet())
@@ -84,8 +80,6 @@ class BillingUi(QWidget):
         main_content_layout.addWidget(billing_table_frame, 2)
         # Recent Bills Section
         recent_bills_frame = QFrame()
-        recent_bills_frame.setFrameShape(QFrame.StyledPanel)
-        recent_bills_frame.setStyleSheet("border: 1px solid #ccc; background: #fff;")
         recent_bills_layout = QVBoxLayout(recent_bills_frame)
         recent_bills_title = QLabel("Recent Bills & Drafts")
         recent_bills_title.setStyleSheet(self.get_section_title_stylesheet())
@@ -105,8 +99,6 @@ class BillingUi(QWidget):
         layout.addLayout(main_content_layout)
         # --- Bill Summary Section ---
         bill_summary_frame = QFrame()
-        bill_summary_frame.setFrameShape(QFrame.StyledPanel)
-        bill_summary_frame.setStyleSheet("border: 1px solid #ccc; background: #fff;")
         bill_summary_layout = QGridLayout(bill_summary_frame)
         bill_summary_layout.setContentsMargins(12, 12, 12, 12)
         bill_summary_layout.setSpacing(10)
@@ -122,9 +114,10 @@ class BillingUi(QWidget):
         self.tax_spin.setRange(0, 100)
         self.tax_spin.setSuffix(" %")
         bill_summary_layout.addWidget(self.tax_spin, 2, 1)
-        bill_summary_layout.addWidget(QLabel("Discount (₹):"), 3, 0)
+        bill_summary_layout.addWidget(QLabel("Discount (%):"), 3, 0)
         self.discount_spin = QDoubleSpinBox()
-        self.discount_spin.setRange(0, 100000)
+        self.discount_spin.setRange(0, 100)
+        self.discount_spin.setSuffix(" %")
         bill_summary_layout.addWidget(self.discount_spin, 3, 1)
         bill_summary_layout.addWidget(QLabel("Total:"), 4, 0)
         self.total_label = QLabel("₹0.00")

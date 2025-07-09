@@ -471,6 +471,214 @@ class NotificationSettingsDialog(QDialog):
         self.save_btn.setEnabled(valid)
 
 
+class NotificationSettingsWidget(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.notification_manager = NotificationManager()
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+
+        # Email Settings
+        email_group = QWidget()
+        email_layout = QVBoxLayout(email_group)
+        email_title = QLabel("Email Notifications")
+        email_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #1976d2;")
+        email_layout.addWidget(email_title)
+
+        # Email enable checkbox
+        self.email_enabled = QCheckBox("Enable Email Notifications")
+        self.email_enabled.setChecked(
+            self.notification_manager.config["email"]["enabled"]
+        )
+        email_layout.addWidget(self.email_enabled)
+
+        # Email form
+        email_form = QFormLayout()
+        self.smtp_server = QLineEdit(
+            self.notification_manager.config["email"]["smtp_server"]
+        )
+        self.smtp_port = QSpinBox()
+        self.smtp_port.setRange(1, 65535)
+        self.smtp_port.setValue(self.notification_manager.config["email"]["smtp_port"])
+        self.sender_email = QLineEdit(
+            self.notification_manager.config["email"]["sender_email"]
+        )
+        self.sender_password = QLineEdit(
+            self.notification_manager.config["email"]["sender_password"]
+        )
+        self.sender_password.setEchoMode(QLineEdit.Password)
+        self.sender_password.setPlaceholderText(
+            "Use App Password for Gmail (not regular password)"
+        )
+        self.recipient_emails = QLineEdit(
+            ", ".join(self.notification_manager.config["email"]["recipient_emails"])
+        )
+        self.recipient_emails.setPlaceholderText(
+            "email1@example.com, email2@example.com"
+        )
+
+        # Add helpful note about Gmail App Passwords
+        gmail_note = QLabel(
+            "Note: For Gmail, you need to use an App Password instead of your "
+            "regular password.\nGo to Google Account → Security → 2-Step Verification "
+            "→ App passwords"
+        )
+        gmail_note.setStyleSheet("color: #666; font-size: 11px; font-style: italic;")
+        gmail_note.setWordWrap(True)
+
+        email_form.addRow("SMTP Server:", self.smtp_server)
+        email_form.addRow("SMTP Port:", self.smtp_port)
+        email_form.addRow("Sender Email:", self.sender_email)
+        email_form.addRow("Sender Password:", self.sender_password)
+        email_form.addRow("Recipient Emails:", self.recipient_emails)
+        email_layout.addWidget(gmail_note)
+        email_layout.addLayout(email_form)
+
+        # WhatsApp Settings
+        whatsapp_group = QWidget()
+        whatsapp_layout = QVBoxLayout(whatsapp_group)
+        whatsapp_title = QLabel("WhatsApp Notifications")
+        whatsapp_title.setStyleSheet(
+            "font-size: 16px; font-weight: bold; color: #25d366;"
+        )
+        whatsapp_layout.addWidget(whatsapp_title)
+
+        # WhatsApp enable checkbox
+        self.whatsapp_enabled = QCheckBox("Enable WhatsApp Notifications")
+        self.whatsapp_enabled.setChecked(
+            self.notification_manager.config["whatsapp"]["enabled"]
+        )
+        whatsapp_layout.addWidget(self.whatsapp_enabled)
+
+        # WhatsApp form
+        whatsapp_form = QFormLayout()
+        self.whatsapp_api_key = QLineEdit(
+            self.notification_manager.config["whatsapp"]["api_key"]
+        )
+        self.whatsapp_api_key.setPlaceholderText("Account SID:Auth Token (for Twilio)")
+        self.whatsapp_phone_numbers = QLineEdit(
+            ", ".join(self.notification_manager.config["whatsapp"]["phone_numbers"])
+        )
+        self.whatsapp_phone_numbers.setPlaceholderText("+1234567890, +0987654321")
+
+        whatsapp_form.addRow("API Key:", self.whatsapp_api_key)
+        whatsapp_form.addRow("Phone Numbers:", self.whatsapp_phone_numbers)
+        whatsapp_layout.addLayout(whatsapp_form)
+
+        # Add helpful note about WhatsApp APIs
+        whatsapp_note = QLabel(
+            "Recommended: Twilio WhatsApp API\n"
+            "• Sign up at: https://www.twilio.com/whatsapp\n"
+            "• Use sandbox for testing\n"
+            "• Format: Account SID:Auth Token"
+        )
+        whatsapp_note.setStyleSheet("color: #666; font-size: 11px; font-style: italic;")
+        whatsapp_note.setWordWrap(True)
+        whatsapp_layout.addWidget(whatsapp_note)
+
+        # SMS Settings
+        sms_group = QWidget()
+        sms_layout = QVBoxLayout(sms_group)
+        sms_title = QLabel("SMS Notifications")
+        sms_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #ff6b35;")
+        sms_layout.addWidget(sms_title)
+
+        # SMS enable checkbox
+        self.sms_enabled = QCheckBox("Enable SMS Notifications")
+        self.sms_enabled.setChecked(self.notification_manager.config["sms"]["enabled"])
+        sms_layout.addWidget(self.sms_enabled)
+
+        # SMS form
+        sms_form = QFormLayout()
+        self.sms_api_key = QLineEdit(self.notification_manager.config["sms"]["api_key"])
+        self.sms_api_key.setPlaceholderText("Account SID:Auth Token")
+        self.sms_phone_numbers = QLineEdit("+919923706784, +919876543210")
+        self.sms_phone_numbers.setPlaceholderText("+919923706784, +919876543210")
+
+        sms_form.addRow("API Key:", self.sms_api_key)
+        sms_form.addRow("Phone Numbers:", self.sms_phone_numbers)
+        sms_layout.addLayout(sms_form)
+
+        # Add helpful note about SMS APIs
+        sms_note = QLabel(
+            "Twilio SMS Setup:\n"
+            "• Get Account SID & Auth Token from Twilio Console\n"
+            "• Get a Twilio phone number for sending SMS\n"
+            "• Update from_number in notifications.py\n"
+            "• For trial: verify recipient numbers in Twilio Console"
+        )
+        sms_note.setStyleSheet("color: #666; font-size: 11px; font-style: italic;")
+        sms_note.setWordWrap(True)
+        sms_layout.addWidget(sms_note)
+
+        # Add all groups to main layout
+        layout.addWidget(email_group)
+        layout.addWidget(whatsapp_group)
+        layout.addWidget(sms_group)
+
+        # Buttons
+        button_layout = QHBoxLayout()
+        self.save_btn = QPushButton("Save Settings")
+        self.test_btn = QPushButton("Test Notifications")
+        self.save_btn.clicked.connect(self.save_settings)
+        self.test_btn.clicked.connect(self.test_notifications)
+        button_layout.addWidget(self.save_btn)
+        button_layout.addWidget(self.test_btn)
+        button_layout.addStretch()
+        layout.addLayout(button_layout)
+
+        self.email_enabled.toggled.connect(self.validate)
+        self.smtp_server.textChanged.connect(self.validate)
+        self.smtp_port.valueChanged.connect(self.validate)
+        self.sender_email.textChanged.connect(self.validate)
+        self.sender_password.textChanged.connect(self.validate)
+        self.recipient_emails.textChanged.connect(self.validate)
+        self.whatsapp_enabled.toggled.connect(self.validate)
+        self.whatsapp_api_key.textChanged.connect(self.validate)
+        self.whatsapp_phone_numbers.textChanged.connect(self.validate)
+        self.sms_enabled.toggled.connect(self.validate)
+        self.sms_api_key.textChanged.connect(self.validate)
+        self.sms_phone_numbers.textChanged.connect(self.validate)
+        self.validate()
+
+    def save_settings(self):
+        try:
+            self.notification_manager.update_config("email", "enabled", self.email_enabled.isChecked())
+            self.notification_manager.update_config("email", "smtp_server", self.smtp_server.text())
+            self.notification_manager.update_config("email", "smtp_port", self.smtp_port.value())
+            self.notification_manager.update_config("email", "sender_email", self.sender_email.text())
+            self.notification_manager.update_config("email", "sender_password", self.sender_password.text())
+            self.notification_manager.update_config("email", "recipient_emails", [e.strip() for e in self.recipient_emails.text().split(",") if e.strip()])
+            self.notification_manager.update_config("whatsapp", "enabled", self.whatsapp_enabled.isChecked())
+            self.notification_manager.update_config("whatsapp", "api_key", self.whatsapp_api_key.text())
+            self.notification_manager.update_config("whatsapp", "phone_numbers", [n.strip() for n in self.whatsapp_phone_numbers.text().split(",") if n.strip()])
+            self.notification_manager.update_config("sms", "enabled", self.sms_enabled.isChecked())
+            self.notification_manager.update_config("sms", "api_key", self.sms_api_key.text())
+            self.notification_manager.update_config("sms", "phone_numbers", [n.strip() for n in self.sms_phone_numbers.text().split(",") if n.strip()])
+            QMessageBox.information(self, "Success", "Notification settings saved successfully.")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to save notification settings: {str(e)}")
+
+    def test_notifications(self):
+        # Optionally, implement test logic or call existing test_notifications
+        try:
+            self.notification_manager.test_notifications()
+            QMessageBox.information(self, "Test", "Test notifications sent (check your channels).")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to send test notifications: {str(e)}")
+
+    def validate(self):
+        valid = bool(
+            self.smtp_server.text().strip() and
+            self.sender_email.text().strip() and
+            self.sender_password.text().strip() and
+            self.recipient_emails.text().strip()
+        )
+        self.save_btn.setEnabled(valid)
+
+
 class CustomerInfoDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -510,21 +718,26 @@ class SupplierInfoDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Supplier Information")
         self.setModal(True)
-        self.setMinimumSize(400, 250)
+        self.setMinimumSize(400, 300)
         layout = QFormLayout(self)
         self.name = QLineEdit()
         self.phone = QLineEdit()
         self.phone.setPlaceholderText("WhatsApp number, e.g. +919999999999")
         self.email = QLineEdit()
         self.email.setPlaceholderText("supplier@email.com")
+        self.expected_date = QDateEdit()
+        self.expected_date.setCalendarPopup(True)
+        self.expected_date.setDate(QDate.currentDate().addDays(3))
         layout.addRow("Name:", self.name)
         layout.addRow("Phone:", self.phone)
         layout.addRow("Email:", self.email)
+        layout.addRow("Expected Delivery Date:", self.expected_date)
         self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
         layout.addRow(self.button_box)
         self.name.textChanged.connect(self.validate)
+        self.expected_date.dateChanged.connect(self.validate)
         self.validate()
 
     def get_data(self):
@@ -532,10 +745,11 @@ class SupplierInfoDialog(QDialog):
             "name": self.name.text().strip(),
             "phone": self.phone.text().strip(),
             "email": self.email.text().strip(),
+            "expected_date": self.expected_date.date().toPyDate(),
         }
 
     def validate(self):
-        valid = bool(self.name.text().strip())
+        valid = bool(self.name.text().strip() and self.expected_date.date() >= QDate.currentDate())
         self.button_box.button(QDialogButtonBox.Ok).setEnabled(valid)
 
 
@@ -722,20 +936,22 @@ class BulkThresholdDialog(QDialog):
         # Set QSpinBox delegate for 'New Threshold' column
         self.table.setItemDelegateForColumn(3, SpinBoxDelegate(self.table))
 
-        layout.addWidget(self.table)
+        # Add table and buttons side by side
+        table_button_layout = QHBoxLayout()
+        table_button_layout.addWidget(self.table, stretch=1)
 
-        # Buttons
-        button_layout = QHBoxLayout()
+        # Vertical layout for buttons
+        button_vlayout = QVBoxLayout()
+        button_vlayout.addStretch()
         self.save_btn = QPushButton("Save All Thresholds")
         self.cancel_btn = QPushButton("Cancel")
-
         self.save_btn.clicked.connect(self.save_all_thresholds)
         self.cancel_btn.clicked.connect(self.reject)
-
-        button_layout.addWidget(self.save_btn)
-        button_layout.addStretch()
-        button_layout.addWidget(self.cancel_btn)
-        layout.addLayout(button_layout)
+        button_vlayout.addWidget(self.save_btn)
+        button_vlayout.addWidget(self.cancel_btn)
+        button_vlayout.addStretch()
+        table_button_layout.addLayout(button_vlayout)
+        layout.addLayout(table_button_layout)
 
     def save_all_thresholds(self):
         """Save all threshold changes"""
@@ -961,95 +1177,55 @@ class EditMedicineDialog(QDialog):
         self.save_btn.setEnabled(valid)
 
 
-class PharmacyDetailsDialog(QDialog):
+class PharmacyDetailsWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Pharmacy Details")
-        self.setModal(True)
-        self.setMinimumSize(540, 420)
         self.init_ui()
         self.load_existing_details()
 
     def init_ui(self):
         layout = QVBoxLayout(self)
         layout.setSpacing(20)
-
-        # Title
         title = QLabel("Pharmacy Details")
-        title.setStyleSheet(
-            "font-size: 18px; font-weight: bold; color: #1976d2; margin-bottom: 10px;"
-        )
+        title.setStyleSheet("font-size: 18px; font-weight: bold; color: #1976d2; margin-bottom: 10px;")
         layout.addWidget(title)
-
-        # Description
-        desc = QLabel(
-            "Configure your pharmacy details that will appear on bills, orders, "
-            "and other documents."
-        )
+        desc = QLabel("Configure your pharmacy details that will appear on bills, orders, and other documents.")
         desc.setStyleSheet("color: #666; font-size: 12px; margin-bottom: 15px;")
         desc.setWordWrap(True)
         layout.addWidget(desc)
-
-        # Form
         form_layout = QFormLayout()
         form_layout.setSpacing(15)
-
-        # Pharmacy Name
         self.name_edit = QLineEdit()
         self.name_edit.setPlaceholderText("Enter pharmacy name")
         form_layout.addRow("Pharmacy Name*:", self.name_edit)
-
-        # Address
         self.address_edit = QTextEdit()
         self.address_edit.setMaximumHeight(80)
         self.address_edit.setPlaceholderText("Enter complete address")
         form_layout.addRow("Address*:", self.address_edit)
-
-        # Phone
         self.phone_edit = QLineEdit()
         self.phone_edit.setPlaceholderText("Enter phone number")
         form_layout.addRow("Phone*:", self.phone_edit)
-
-        # Email
         self.email_edit = QLineEdit()
         self.email_edit.setPlaceholderText("Enter email address")
         form_layout.addRow("Email*:", self.email_edit)
-
-        # GST Number
         self.gst_edit = QLineEdit()
         self.gst_edit.setPlaceholderText("Enter GST number (optional)")
         form_layout.addRow("GST Number:", self.gst_edit)
-
-        # License Number
         self.license_edit = QLineEdit()
         self.license_edit.setPlaceholderText("Enter license number (optional)")
         form_layout.addRow("License Number:", self.license_edit)
-
-        # Website
         self.website_edit = QLineEdit()
         self.website_edit.setPlaceholderText("Enter website URL (optional)")
         form_layout.addRow("Website:", self.website_edit)
-
         layout.addLayout(form_layout)
-
-        # Buttons
         button_layout = QHBoxLayout()
         button_layout.addStretch()
-
         self.save_btn = QPushButton("Save Details")
         self.save_btn.setMinimumHeight(40)
         self.save_btn.setMinimumWidth(120)
         self.save_btn.clicked.connect(self.save_details)
         button_layout.addWidget(self.save_btn)
-
-        cancel_btn = QPushButton("Cancel")
-        cancel_btn.setMinimumHeight(40)
-        cancel_btn.setMinimumWidth(100)
-        cancel_btn.clicked.connect(self.reject)
-        button_layout.addWidget(cancel_btn)
-
         layout.addLayout(button_layout)
-
         self.name_edit.textChanged.connect(self.validate)
         self.address_edit.textChanged.connect(self.validate)
         self.phone_edit.textChanged.connect(self.validate)
@@ -1075,8 +1251,6 @@ class PharmacyDetailsDialog(QDialog):
         gst_number = self.gst_edit.text().strip()
         license_number = self.license_edit.text().strip()
         website = self.website_edit.text().strip()
-
-        # Validate required fields
         if not name:
             QMessageBox.warning(self, "Validation Error", "Pharmacy name is required.")
             return
@@ -1089,20 +1263,11 @@ class PharmacyDetailsDialog(QDialog):
         if not email:
             QMessageBox.warning(self, "Validation Error", "Email is required.")
             return
-
-        # Save to database
-        success, message = save_pharmacy_details(
-            name, address, phone, email, gst_number, license_number, website
-        )
-
+        success, message = save_pharmacy_details(name, address, phone, email, gst_number, license_number, website)
         if success:
             QMessageBox.information(self, "Success", message)
-            self.accept()
         else:
-            QMessageBox.critical(
-                self, "Error", f"Failed to save pharmacy details: {message}"
-            )
-
+            QMessageBox.critical(self, "Error", f"Failed to save pharmacy details: {message}")
     def validate(self):
         valid = bool(
             self.name_edit.text().strip() and
@@ -1111,6 +1276,17 @@ class PharmacyDetailsDialog(QDialog):
             self.email_edit.text().strip()
         )
         self.save_btn.setEnabled(valid)
+
+
+class PharmacyDetailsDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Pharmacy Details")
+        self.setModal(True)
+        self.setMinimumSize(540, 420)
+        layout = QVBoxLayout(self)
+        self.widget = PharmacyDetailsWidget(self)
+        layout.addWidget(self.widget)
 
 
 class QuickAddStockDialog(QDialog):
@@ -1179,20 +1355,21 @@ class QuickAddStockDialog(QDialog):
         # Connect cell changed signal to update totals
         self.table.itemChanged.connect(self.on_cell_changed)
 
-        layout.addWidget(self.table)
+        # New layout: table and buttons side by side
+        table_button_layout = QHBoxLayout()
+        table_button_layout.addWidget(self.table, stretch=1)
 
-        # Buttons
-        button_layout = QHBoxLayout()
-        save_btn = QPushButton("Add Stock")
-        cancel_btn = QPushButton("Cancel")
-
-        save_btn.clicked.connect(self.add_stock)
-        cancel_btn.clicked.connect(self.reject)
-
-        button_layout.addWidget(save_btn)
-        button_layout.addStretch()
-        button_layout.addWidget(cancel_btn)
-        layout.addLayout(button_layout)
+        button_vlayout = QVBoxLayout()
+        button_vlayout.addStretch()
+        self.save_btn = QPushButton("Add Stock")
+        self.cancel_btn = QPushButton("Cancel")
+        self.save_btn.clicked.connect(self.add_stock)
+        self.cancel_btn.clicked.connect(self.reject)
+        button_vlayout.addWidget(self.save_btn)
+        button_vlayout.addWidget(self.cancel_btn)
+        button_vlayout.addStretch()
+        table_button_layout.addLayout(button_vlayout)
+        layout.addLayout(table_button_layout)
 
     def on_cell_changed(self, item):
         """Update the new total when add quantity changes"""
@@ -1252,6 +1429,12 @@ class QuickAddStockDialog(QDialog):
                     parent = parent.parent() if hasattr(parent, 'parent') else None
                 if parent and hasattr(parent, 'refresh_inventory_table'):
                     parent.refresh_inventory_table()
+                # Automatically send low stock alerts after quick add stock
+                if parent and hasattr(parent, 'alert_service'):
+                    success, msg = parent.alert_service.send_all_alerts()
+                    import logging
+                    logger = logging.getLogger("QuickAddStockDialog")
+                    logger.info(f"[AutoAlert] After quick add stock: success={success}, msg={msg}")
                 self.accept()
             else:
                 QMessageBox.information(

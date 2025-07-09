@@ -37,6 +37,34 @@ class OrderService:
         except Exception as e:
             return False, str(e)
 
+    def update(self, order_id: int, supplier: str, order_items: list) -> tuple:
+        """
+        Update an existing order (if pending).
+        :param order_id: Order ID
+        :param supplier: Supplier name
+        :param order_items: List of medicine dicts
+        :return: (success, error message)
+        """
+        from db import update_order
+        try:
+            update_order(order_id, supplier, order_items)
+            return True, None
+        except Exception as e:
+            return False, str(e)
+
+    def delete(self, order_id: int) -> tuple:
+        """
+        Delete an order by ID (only if pending).
+        :param order_id: Order ID
+        :return: (success, error message)
+        """
+        from db import delete_order
+        try:
+            delete_order(order_id)
+            return True, None
+        except Exception as e:
+            return False, str(e)
+
     def generate_order_pdf(self, order_items: List[Dict[str, Any]], order_id: int, timestamp: str, supplier_info: Optional[Dict[str, Any]] = None) -> str:
         """
         Generate a PDF for the order and return the file path.

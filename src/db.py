@@ -6,7 +6,7 @@ from logging.handlers import RotatingFileHandler
 from sqlalchemy import Column, Date, ForeignKey, Integer, String, create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.orm import relationship, sessionmaker, joinedload
 
 from config import get_threshold
 
@@ -41,6 +41,7 @@ class Order(Base):
     id = Column(Integer, primary_key=True)
     timestamp = Column(String, nullable=False)
     file_path = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="pending")  # 'pending' or 'completed'
     medicines = relationship("OrderMedicine", back_populates="order")
 
 
@@ -75,6 +76,7 @@ class BillItem(Base):
     price = Column(Integer, nullable=False)
     quantity = Column(Integer, nullable=False)
     subtotal = Column(Integer, nullable=False)
+    discount = Column(Integer, nullable=True, default=0)
     bill = relationship("Bill", back_populates="items")
 
 
@@ -113,7 +115,6 @@ def init_db() -> None:
         # Check if threshold column exists, if not add it
         try:
             session = Session()
-            # Try to query the threshold column
             session.query(Medicine.threshold).first()
             session.close()
         except:
@@ -130,6 +131,24 @@ def init_db() -> None:
                 )
                 conn.commit()
             print("Threshold column added successfully!")
+
+        # Check if status column exists in orders, if not add it
+        try:
+            session = Session()
+            session.query(Order.status).first()
+            session.close()
+        except:
+            print("Adding status column to existing orders...")
+            from sqlalchemy import text
+            with engine.connect() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE orders ADD COLUMN "
+                        "status VARCHAR DEFAULT 'pending'"
+                    )
+                )
+                conn.commit()
+            print("Status column added successfully!")
 
         # Check if pharmacy_details table exists, if not create it
         try:
@@ -384,13 +403,26 @@ def get_all_orders() -> list:
     return orders
 
 
-def add_bill(timestamp: str, total: int, items: list, file_path: str = None) -> None:
+def get_order_items(order_id: int) -> list:
+    """
+    Retrieve all order items (OrderMedicine) for a given order ID.
+    :param order_id: Order ID
+    :return: List of OrderMedicine objects
+    """
+    session = Session()
+    items = session.query(OrderMedicine).filter_by(order_id=order_id).all()
+    session.close()
+    return items
+
+
+def add_bill(timestamp: str, total: int, items: list, file_path: str = None) -> int:
     """
     Add a new bill to the database.
     :param timestamp: Bill timestamp
     :param total: Total bill amount
     :param items: List of bill item dicts
     :param file_path: Optional path to bill PDF
+    :return: Bill ID
     """
     session = Session()
     bill = Bill(timestamp=timestamp, total=total, file_path=file_path)
@@ -404,10 +436,13 @@ def add_bill(timestamp: str, total: int, items: list, file_path: str = None) -> 
             price=item["price"],
             quantity=item["quantity"],
             subtotal=item["subtotal"],
+            discount=item.get("discount", 0)
         )
         session.add(bill_item)
     session.commit()
+    bill_id = bill.id  # Capture the ID before closing the session
     session.close()
+    return bill_id
 
 
 def get_all_bills() -> list:
@@ -416,28 +451,36 @@ def get_all_bills() -> list:
     :return: List of Bill objects
     """
     session = Session()
-    bills = session.query(Bill).order_by(Bill.id.desc()).all()
-    for bill in bills:
-        bill.items_list = session.query(BillItem).filter_by(bill_id=bill.id).all()
+    bills = session.query(Bill).options(joinedload(Bill.items)).order_by(Bill.id.desc()).all()
     session.close()
     return bills
 
 
-def get_monthly_sales() -> list:
+def get_monthly_sales(start_date=None, end_date=None) -> list:
     """
-    Return a list of (Month, Total Sales, Bill Count, Average Bill) for each month with sales.
+    Return a list of (Month, Total Sales, Bill Count, Average Bill) for each month with sales, filtered by date range if provided.
+    :param start_date: (optional) string 'YYYY-MM-DD' or datetime.date
+    :param end_date: (optional) string 'YYYY-MM-DD' or datetime.date
     :return: List of tuples (month_name, total, count, avg)
     """
     session = Session()
     try:
-        # Get all bills, sorted by timestamp
-        bills = session.query(Bill).order_by(Bill.timestamp).all()
         import calendar
         from collections import defaultdict
-
+        import datetime
+        # Prepare date filters
+        query = session.query(Bill)
+        if start_date:
+            if isinstance(start_date, str):
+                start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d").date()
+            query = query.filter(Bill.timestamp >= str(start_date))
+        if end_date:
+            if isinstance(end_date, str):
+                end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d").date()
+            query = query.filter(Bill.timestamp <= str(end_date))
+        bills = query.order_by(Bill.timestamp).all()
         monthly = defaultdict(lambda: {"total": 0, "count": 0})
         for bill in bills:
-            # Parse the bill's timestamp to get year and month
             try:
                 dt = datetime.datetime.strptime(bill.timestamp[:10], "%Y-%m-%d")
             except Exception:
@@ -445,7 +488,6 @@ def get_monthly_sales() -> list:
             key = (dt.year, dt.month)
             monthly[key]["total"] += bill.total
             monthly[key]["count"] += 1
-        # Prepare result: list of (Month, Total Sales, Bill Count, Average Bill)
         result = []
         for (year, month), data in sorted(monthly.items()):
             month_name = f"{calendar.month_name[month]} {year}"
@@ -613,3 +655,115 @@ def clear_all_bills() -> None:
         return False
     finally:
         session.close()
+
+
+def update_order_status(order_id: int, status: str) -> bool:
+    """
+    Update the status of an order.
+    :param order_id: Order ID
+    :param status: New status ('pending' or 'completed')
+    :return: True if updated, False otherwise
+    """
+    session = Session()
+    try:
+        order = session.query(Order).filter_by(id=order_id).first()
+        if order:
+            order.status = status
+            session.commit()
+            return True
+        return False
+    except Exception as e:
+        session.rollback()
+        print(f"Error updating order status: {e}")
+        return False
+    finally:
+        session.close()
+
+
+def update_bill_file_path(bill_id: int, file_path: str) -> None:
+    """
+    Update the file_path of a bill after PDF generation.
+    :param bill_id: Bill ID
+    :param file_path: Path to the PDF receipt
+    """
+    session = Session()
+    bill = session.query(Bill).filter_by(id=bill_id).first()
+    if bill:
+        bill.file_path = file_path
+        session.commit()
+        print(f"[DEBUG] Updated bill {bill_id} with file_path: {file_path}")
+        session.expire_all()  # Force session refresh
+    else:
+        print(f"[DEBUG] Bill {bill_id} not found for file_path update!")
+    session.close()
+
+
+def update_order(order_id: int, supplier: str, medicines: list) -> None:
+    """
+    Update an existing order and its medicines. Only allowed if order is pending.
+    :param order_id: Order ID
+    :param supplier: Supplier name
+    :param medicines: List of medicine dicts
+    """
+    session = Session()
+    order = session.query(Order).filter_by(id=order_id).first()
+    if not order:
+        session.close()
+        raise Exception("Order not found")
+    if order.status != "pending":
+        session.close()
+        raise Exception("Only pending orders can be edited")
+    # Update supplier for all medicines
+    # Remove existing medicines
+    session.query(OrderMedicine).filter_by(order_id=order_id).delete()
+    # Add new medicines
+    for med in medicines:
+        order_med = OrderMedicine(
+            order_id=order_id,
+            barcode=med.get("barcode"),
+            name=med.get("name"),
+            quantity=med.get("quantity"),
+            expiry=str(med.get("expiry")) if med.get("expiry") else "",
+            manufacturer=med.get("manufacturer") or supplier,
+            order_quantity=med.get("order_quantity", None),
+        )
+        session.add(order_med)
+    session.commit()
+    session.close()
+
+
+def delete_order(order_id: int) -> None:
+    """
+    Delete an order and its medicines by ID, only if the order is pending.
+    :param order_id: Order ID
+    """
+    session = Session()
+    order = session.query(Order).filter_by(id=order_id).first()
+    if not order:
+        session.close()
+        raise Exception("Order not found")
+    if order.status != "pending":
+        session.close()
+        raise Exception("Only pending orders can be deleted")
+    session.query(OrderMedicine).filter_by(order_id=order_id).delete()
+    session.delete(order)
+    session.commit()
+    session.close()
+
+
+def update_order_file_path(order_id: int, file_path: str) -> None:
+    """
+    Update the file_path of an order by ID.
+    :param order_id: Order ID
+    :param file_path: Path to PDF file
+    """
+    session = Session()
+    order = session.query(Order).filter_by(id=order_id).first()
+    if not order:
+        session.close()
+        raise Exception("Order not found")
+    order.file_path = file_path
+    session.commit()
+    session.close()
+
+print(f"[DEBUG] Using DB file: {os.path.abspath(DB_FILENAME)}")

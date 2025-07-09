@@ -3,6 +3,12 @@ from db import get_pharmacy_details, save_pharmacy_details
 from config import get_theme, set_theme, get_license_key, set_license_key, get_installation_date, set_installation_date
 from notifications import NotificationManager
 
+try:
+    from config import set_accent_color, set_gradient
+except ImportError:
+    set_accent_color = None
+    set_gradient = None
+
 class SettingsService:
     """
     Service class for all settings-related business logic.
@@ -58,6 +64,7 @@ class SettingsService:
         Set the license key.
         :param key: License key string
         """
+        print(f"[DEBUG] set_license_key called with: {key}")
         set_license_key(key)
 
     def get_installation_date(self) -> Optional[str]:
@@ -89,4 +96,26 @@ class SettingsService:
         """
         notif = NotificationManager()
         notif.config = config
-        notif.save_config() 
+        notif.save_config()
+
+    def set_accent_color(self, color: str) -> None:
+        """
+        Set the accent color for the application.
+        :param color: Color string (e.g., '#1976d2')
+        """
+        if set_accent_color:
+            set_accent_color(color)
+        else:
+            # Fallback: store in-memory (not persistent)
+            self._accent_color = color
+
+    def set_gradient(self, gradient: str) -> None:
+        """
+        Set the background gradient for the application.
+        :param gradient: Gradient name string
+        """
+        if set_gradient:
+            set_gradient(gradient)
+        else:
+            # Fallback: store in-memory (not persistent)
+            self._gradient = gradient 

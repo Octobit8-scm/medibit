@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTableWidget, QHeaderView, QSizePolicy)
+from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTableWidget, QHeaderView, QSizePolicy, QMessageBox, QTableWidgetItem)
 from PyQt5.QtCore import Qt
 
 class AlertsUi(QWidget):
@@ -7,6 +7,8 @@ class AlertsUi(QWidget):
         self.main_window = main_window
         self.get_button_stylesheet = main_window.get_button_stylesheet
         self.init_ui()
+        self.refresh_alerts_table()
+        self.send_alerts_btn.clicked.connect(self.send_alerts)
 
     def init_ui(self):
         layout = QVBoxLayout(self)
@@ -32,4 +34,24 @@ class AlertsUi(QWidget):
         self.alerts_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.alerts_table.setAlternatingRowColors(True)
         self.alerts_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        layout.addWidget(self.alerts_table) 
+        layout.addWidget(self.alerts_table)
+
+    def refresh_alerts_table(self):
+        self.alerts_table.setRowCount(0)
+        low_stock = self.main_window.alert_service.get_low_stock()
+        for med in low_stock:
+            row = self.alerts_table.rowCount()
+            self.alerts_table.insertRow(row)
+            self.alerts_table.setItem(row, 0, QTableWidgetItem(med.name))
+            self.alerts_table.setItem(row, 1, QTableWidgetItem(str(med.quantity)))
+            self.alerts_table.setItem(row, 2, QTableWidgetItem(str(med.threshold)))
+            status = "Low" if med.quantity < med.threshold else "OK"
+            self.alerts_table.setItem(row, 3, QTableWidgetItem(status))
+            self.alerts_table.setItem(row, 4, QTableWidgetItem('-'))
+
+    def send_alerts(self):
+        success, msg = self.main_window.alert_service.send_all_alerts()
+        if success:
+            QMessageBox.information(self, "Alerts Sent", msg)
+        else:
+            QMessageBox.warning(self, "Send Failed", msg) 

@@ -5,6 +5,8 @@ import pytest
 import datetime
 
 from src.db import init_db, clear_inventory, add_medicine, clear_all_bills, add_bill, save_pharmacy_details, add_order
+from src.settings_service import SettingsService
+from src.license_utils import generate_license_key
 
 
 @pytest.fixture(autouse=True)
@@ -13,6 +15,16 @@ def setup_database():
     init_db()
     yield
     # Cleanup could be added here if needed
+
+@pytest.fixture(autouse=True)
+def activate_license():
+    settings_service = SettingsService()
+    # Use a unique test email for identification
+    test_email = "testuser@example.com"
+    expiry = (datetime.datetime.now() + datetime.timedelta(days=30)).strftime("%Y-%m-%d")
+    key = generate_license_key(test_email, expiry)
+    settings_service.set_license_key(key)
+    settings_service.set_installation_date(datetime.datetime.now().strftime("%Y-%m-%d"))
 
 def pytest_configure():
     # Optionally, global setup for all tests

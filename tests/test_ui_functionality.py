@@ -59,20 +59,28 @@ def test_inventory_ui_expired_and_low_stock(app_and_window, sample_inventory):
 def test_billing_ui_shows_sample_data(app_and_window, sample_billing):
     window, qtbot = app_and_window
     qtbot.mouseClick(window.nav_buttons[1], Qt.LeftButton)
-    window.billing_ui.refresh_billing_history()
+    window.refresh_billing_history()
     qtbot.wait(100)
     assert window.billing_ui.billing_history_list.count() > 0
 
 def test_billing_ui_discounted_bill(app_and_window, sample_billing):
     window, qtbot = app_and_window
     qtbot.mouseClick(window.nav_buttons[1], Qt.LeftButton)
-    window.billing_ui.refresh_billing_history()
+    window.refresh_billing_history()
     qtbot.wait(100)
     found_discount = False
     for i in range(window.billing_ui.billing_history_list.count()):
         item = window.billing_ui.billing_history_list.item(i)
-        if item and ("PainRelief" in item.text() or "Cough Syrup" in item.text()):
-            found_discount = True
+        bill = item.data(Qt.UserRole)
+        if hasattr(bill, 'items'):
+            print(f'Bill {i} items:')
+            for line in bill.items:
+                print('  name:', getattr(line, 'name', None), 'discount:', getattr(line, 'discount', None))
+                if (
+                    (getattr(line, 'name', None) in ["PainRelief", "Cough Syrup"]) and
+                    (hasattr(line, 'discount') and getattr(line, 'discount', 0) > 0)
+                ):
+                    found_discount = True
     assert found_discount
 
 def test_add_inventory_item(app_and_window, monkeypatch, sample_inventory):
@@ -80,20 +88,44 @@ def test_add_inventory_item(app_and_window, monkeypatch, sample_inventory):
     qtbot.mouseClick(window.nav_buttons[0], Qt.LeftButton)
     window.refresh_inventory_table()
     qtbot.wait(100)
-    qtbot.mouseClick(window.inventory_ui.add_medicine_btn, Qt.LeftButton)
-    from src.dialogs import AddMedicineDialog
-    def fake_exec(self):
-        self.name_edit.setText("TestMed")
-        self.barcode_edit.setText("TEST123")
-        self.quantity_spin.setValue(10)
-        self.price_spin.setValue(50)
-        self.manufacturer_edit.setText("TestManu")
-        self.expiry_edit.setDate(self.expiry_edit.minimumDate())
-        return self.Accepted
-    monkeypatch.setattr(AddMedicineDialog, "exec_", fake_exec)
+
+    # Patch AddMedicineDialog in main_window's namespace
+    import src.main_window as main_window_mod
+
+    class FakeDialog:
+        def __init__(self, *args, **kwargs):
+            pass
+        def exec_(self):
+            return 1  # QDialog.Accepted
+        def get_data(self):
+            return {
+                "name": "TestMed",
+                "barcode": "TEST123",
+                "quantity": 10,
+                "price": 50,
+                "manufacturer": "TestManu",
+                "expiry": datetime.date(2025, 1, 1),
+                "threshold": 5
+            }
+
+    monkeypatch.setattr(main_window_mod, "AddMedicineDialog", FakeDialog)
+
+    # Patch inventory_service.add to print arguments and return value
+    orig_add = window.inventory_service.add
+    def debug_add(data):
+        print('inventory_service.add called with:', data)
+        result = orig_add(data)
+        print('inventory_service.add returned:', result)
+        return result
+    monkeypatch.setattr(window.inventory_service, 'add', debug_add)
+
     qtbot.mouseClick(window.inventory_ui.add_medicine_btn, Qt.LeftButton)
     window.refresh_inventory_table()
     qtbot.wait(100)
+    print('Inventory table items:')
+    for row in range(window.inventory_ui.inventory_table.rowCount()):
+        item = window.inventory_ui.inventory_table.item(row, 1)
+        print(f'Row {row}:', item.text() if item else None)
     found = False
     for row in range(window.inventory_ui.inventory_table.rowCount()):
         if window.inventory_ui.inventory_table.item(row, 1) and window.inventory_ui.inventory_table.item(row, 1).text() == "TestMed":
@@ -103,7 +135,7 @@ def test_add_inventory_item(app_and_window, monkeypatch, sample_inventory):
 def test_billing_add_item_and_save_draft(app_and_window, monkeypatch, sample_billing):
     window, qtbot = app_and_window
     qtbot.mouseClick(window.nav_buttons[1], Qt.LeftButton)
-    window.billing_ui.refresh_billing_history()
+    window.refresh_billing_history()
     qtbot.wait(100)
     table = window.billing_ui.billing_table
     table.insertRow(0)
