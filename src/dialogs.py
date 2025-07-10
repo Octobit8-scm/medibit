@@ -1127,6 +1127,19 @@ class EditMedicineDialog(QDialog):
         self.name.textChanged.connect(self.validate)
         self.validate()
 
+    def get_data(self):
+        """
+        Return the current edited medicine data as a dictionary.
+        """
+        return {
+            "name": self.name.text().strip(),
+            "quantity": self.quantity.value(),
+            "expiry": self.expiry.date().toPyDate(),
+            "manufacturer": self.manufacturer.text().strip(),
+            "price": self.price.value(),
+            "threshold": self.threshold.value(),
+        }
+
     def save_changes(self):
         try:
             # Validate required fields

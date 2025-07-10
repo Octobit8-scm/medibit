@@ -6,6 +6,23 @@ from PyQt5.QtWidgets import QApplication
 from db import init_db  # Import init_db
 from main_window import MainWindow
 from splash_screen import MedibitSplashScreen
+import logging
+import sys
+import traceback
+
+# Add global exception handler to log uncaught exceptions
+
+def log_uncaught_exceptions(exctype, value, tb):
+    logging.critical("Uncaught exception", exc_info=(exctype, value, tb))
+    # Optionally, show a message box to the user
+    try:
+        from PyQt5.QtWidgets import QMessageBox
+        msg = f"An unexpected error occurred:\n{value}\nSee log for details."
+        QMessageBox.critical(None, "Application Error", msg)
+    except Exception:
+        pass
+
+sys.excepthook = log_uncaught_exceptions
 
 if __name__ == "__main__":
     init_db()  # Initialize the database

@@ -7,6 +7,7 @@ from db import (
     delete_medicine,
     clear_inventory,
 )
+import logging
 
 class InventoryService:
     """
@@ -15,83 +16,91 @@ class InventoryService:
     """
 
     def get_all(self) -> List[Any]:
-        """
-        Return all medicines in inventory.
-        :return: List of medicine objects
-        """
-        return get_all_medicines()
+        try:
+            result = get_all_medicines()
+            logging.info(f"Fetched {len(result)} medicines from inventory.")
+            return result
+        except Exception as e:
+            logging.error(f"Error fetching all medicines: {e}", exc_info=True)
+            return []
 
     def add(self, data: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
-        """
-        Add a new medicine to inventory. Prevents duplicate barcodes.
-        :param data: Dictionary with medicine fields
-        :return: (success, error message)
-        """
-        barcode = data["barcode"]
-        existing = [m for m in get_all_medicines() if m.barcode == barcode]
-        if existing:
-            return False, "A medicine with this barcode already exists."
-        return add_medicine(
-            data["barcode"],
-            data["name"],
-            data["quantity"],
-            data["expiry"],
-            data["manufacturer"],
-            data["price"],
-            data["threshold"],
-        )
+        try:
+            barcode = data["barcode"]
+            existing = [m for m in get_all_medicines() if m.barcode == barcode]
+            if existing:
+                logging.warning(f"Attempted to add duplicate barcode: {barcode}")
+                return False, "A medicine with this barcode already exists."
+            result = add_medicine(
+                data["barcode"],
+                data["name"],
+                data["quantity"],
+                data["expiry"],
+                data["manufacturer"],
+                data["price"],
+                data["threshold"],
+            )
+            logging.info(f"Added medicine: {barcode}, result: {result}")
+            return result
+        except Exception as e:
+            logging.error(f"Error adding medicine: {data.get('barcode', 'N/A')}: {e}", exc_info=True)
+            return False, str(e)
 
     def update(self, barcode: str, data: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
-        """
-        Update an existing medicine by barcode.
-        :param barcode: Medicine barcode
-        :param data: Dictionary with updated fields
-        :return: (success, error message)
-        """
-        return update_medicine(
-            barcode,
-            data["name"],
-            data["quantity"],
-            data["expiry"],
-            data["manufacturer"],
-            data["price"],
-            data["threshold"],
-        )
+        try:
+            result = update_medicine(
+                barcode,
+                data["name"],
+                data["quantity"],
+                data["expiry"],
+                data["manufacturer"],
+                data["price"],
+                data["threshold"],
+            )
+            logging.info(f"Updated medicine: {barcode}, result: {result}")
+            return result
+        except Exception as e:
+            logging.error(f"Error updating medicine: {barcode}: {e}", exc_info=True)
+            return False, str(e)
 
     def update_quantity(self, barcode: str, quantity: int) -> Tuple[bool, Optional[str]]:
-        """
-        Update the quantity of a medicine by barcode.
-        :param barcode: Medicine barcode
-        :param quantity: New quantity
-        :return: (success, error message)
-        """
-        return update_medicine_quantity(barcode, quantity), None
+        try:
+            result = update_medicine_quantity(barcode, quantity), None
+            logging.info(f"Updated quantity for {barcode} to {quantity}, result: {result}")
+            return result
+        except Exception as e:
+            logging.error(f"Error updating quantity for {barcode}: {e}", exc_info=True)
+            return False, str(e)
 
     def delete(self, barcode: str) -> Tuple[bool, Optional[str]]:
-        """
-        Delete a medicine by barcode.
-        :param barcode: Medicine barcode
-        :return: (success, error message)
-        """
-        return delete_medicine(barcode)
+        try:
+            result = delete_medicine(barcode)
+            logging.info(f"Deleted medicine: {barcode}, result: {result}")
+            return result
+        except Exception as e:
+            logging.error(f"Error deleting medicine: {barcode}: {e}", exc_info=True)
+            return False, str(e)
 
     def clear(self) -> Tuple[bool, Optional[str]]:
-        """
-        Clear all medicines from inventory.
-        :return: (success, result message)
-        """
-        return clear_inventory()
+        try:
+            result = clear_inventory()
+            logging.info(f"Cleared inventory, result: {result}")
+            return result
+        except Exception as e:
+            logging.error(f"Error clearing inventory: {e}", exc_info=True)
+            return False, str(e)
 
     def search(self, query: str) -> List[Any]:
-        """
-        Search medicines by name, barcode, or manufacturer (case-insensitive).
-        :param query: Search string
-        :return: List of matching medicine objects
-        """
-        query = query.strip().lower()
-        return [
-            m for m in get_all_medicines()
-            if query in m.name.lower()
-            or query in m.barcode.lower()
-            or (m.manufacturer and query in m.manufacturer.lower())
-        ] 
+        try:
+            query = query.strip().lower()
+            result = [
+                m for m in get_all_medicines()
+                if query in m.name.lower()
+                or query in m.barcode.lower()
+                or (m.manufacturer and query in m.manufacturer.lower())
+            ]
+            logging.info(f"Search for '{query}' returned {len(result)} results.")
+            return result
+        except Exception as e:
+            logging.error(f"Error searching medicines: {e}", exc_info=True)
+            return [] 

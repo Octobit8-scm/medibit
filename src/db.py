@@ -220,17 +220,6 @@ def update_medicine_threshold(barcode: str, threshold: int) -> tuple:
 
 
 def update_medicine(barcode: str, name: str, quantity: int, expiry, manufacturer: str, price: int, threshold: int) -> tuple:
-    """
-    Update all fields of a medicine by barcode.
-    :param barcode: Medicine barcode
-    :param name: Medicine name
-    :param quantity: Quantity in stock
-    :param expiry: Expiry date
-    :param manufacturer: Manufacturer name
-    :param price: Price per unit
-    :param threshold: Stock threshold
-    :return: (success, error message)
-    """
     session = Session()
     try:
         medicine = session.query(Medicine).filter_by(barcode=barcode).first()
@@ -253,12 +242,6 @@ def update_medicine(barcode: str, name: str, quantity: int, expiry, manufacturer
 
 
 def update_medicine_quantity(barcode: str, new_quantity: int) -> tuple:
-    """
-    Update the quantity of a medicine by barcode.
-    :param barcode: Medicine barcode
-    :param new_quantity: New quantity value
-    :return: (success, error message)
-    """
     session = Session()
     try:
         medicine = session.query(Medicine).filter_by(barcode=barcode).first()
@@ -276,26 +259,12 @@ def update_medicine_quantity(barcode: str, new_quantity: int) -> tuple:
 
 
 def add_medicine(barcode: str, name: str, quantity: int, expiry, manufacturer: str, price: int = 0, threshold: int = 10) -> tuple:
-    """
-    Add a new medicine or update an existing one by barcode.
-    :param barcode: Medicine barcode
-    :param name: Medicine name
-    :param quantity: Quantity to add
-    :param expiry: Expiry date
-    :param manufacturer: Manufacturer name
-    :param price: Price per unit
-    :param threshold: Stock threshold
-    :return: (success, message)
-    """
     session = Session()
     try:
-        # Check if medicine with this barcode already exists
         existing_medicine = session.query(Medicine).filter_by(barcode=barcode).first()
-
         if existing_medicine:
-            # Update existing medicine
             existing_medicine.name = name
-            existing_medicine.quantity += quantity  # Add to existing quantity
+            existing_medicine.quantity += quantity
             existing_medicine.expiry = expiry
             existing_medicine.manufacturer = manufacturer
             existing_medicine.price = price
@@ -303,10 +272,9 @@ def add_medicine(barcode: str, name: str, quantity: int, expiry, manufacturer: s
             session.commit()
             return (
                 True,
-                f"Updated existing medicine '{name}' and added " f"{quantity} units",
+                f"Updated existing medicine '{name}' and added {quantity} units",
             )
         else:
-            # Create new medicine
             med = Medicine(
                 barcode=barcode,
                 name=name,
@@ -319,7 +287,6 @@ def add_medicine(barcode: str, name: str, quantity: int, expiry, manufacturer: s
             session.add(med)
             session.commit()
             return True, f"Added new medicine '{name}'"
-
     except IntegrityError as e:
         session.rollback()
         return False, str(e)
