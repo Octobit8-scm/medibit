@@ -73,8 +73,8 @@ jobs:
           ls tests
 
       - name: Start Xvfb (Linux only)
-        if: runner.os == 'Linux'
         uses: GabrielBB/xvfb-action@v1
+        if: runner.os == 'Linux'
 
       # - name: Static Analysis - isort
       #   run: isort --check --diff src/ tests/
