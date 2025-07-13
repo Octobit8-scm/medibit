@@ -8,6 +8,26 @@ from src.db import init_db, clear_inventory, add_medicine, clear_all_bills, add_
 from src.settings_service import SettingsService
 from src.license_utils import generate_license_key
 
+import pytest
+from PyQt5.QtWidgets import QMessageBox, QDialog
+
+@pytest.fixture(autouse=True)
+def patch_messageboxes_and_dialogs(monkeypatch):
+    # Patch QMessageBox methods to auto-accept
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: QMessageBox.Ok)
+    monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: QMessageBox.Ok)
+    monkeypatch.setattr(QMessageBox, "critical", lambda *a, **k: QMessageBox.Ok)
+    monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: QMessageBox.Yes)
+
+    # Patch exec_ for all QDialog subclasses to auto-accept
+    original_exec = QDialog.exec_
+    def auto_accept(self, *a, **k):
+        return QDialog.Accepted
+    monkeypatch.setattr(QDialog, "exec_", auto_accept)
+    yield
+    # Optionally restore original exec_ if needed
+    monkeypatch.setattr(QDialog, "exec_", original_exec)
+
 
 @pytest.fixture(autouse=True)
 def setup_database():
