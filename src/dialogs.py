@@ -1,5 +1,5 @@
-from PyQt5.QtCore import QDate, Qt
-from PyQt5.QtGui import QColor
+from PyQt5.QtCore import QDate, Qt, QThread, pyqtSignal
+from PyQt5.QtGui import QColor, QIcon
 from PyQt5.QtWidgets import (
     QCheckBox,
     QDateEdit,
@@ -21,6 +21,7 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QStyledItemDelegate,
+    QApplication,
 )
 
 from config import get_threshold
@@ -34,6 +35,8 @@ from db import (
     update_medicine_threshold,
 )
 from notifications import NotificationManager
+import re
+import weakref
 
 
 class AddMedicineDialog(QDialog):
@@ -258,12 +261,28 @@ class NotificationSettingsDialog(QDialog):
             self.notification_manager.config["whatsapp"]["api_key"]
         )
         self.whatsapp_api_key.setPlaceholderText("Account SID:Auth Token (for Twilio)")
+        self.whatsapp_api_key.setEchoMode(QLineEdit.Password)
+        self.whatsapp_api_key_toggle = QPushButton()
+        self.whatsapp_api_key_toggle.setCheckable(True)
+        self.whatsapp_api_key_toggle.setFixedWidth(28)
+        self.whatsapp_api_key_toggle.setIcon(QIcon.fromTheme("view-password"))
+        self.whatsapp_api_key_toggle.setToolTip("Show/Hide API Key")
+        self.whatsapp_api_key_toggle.toggled.connect(
+            lambda checked: self.whatsapp_api_key.setEchoMode(QLineEdit.Normal if checked else QLineEdit.Password)
+        )
+        whatsapp_api_key_layout = QHBoxLayout()
+        whatsapp_api_key_layout.addWidget(self.whatsapp_api_key)
+        whatsapp_api_key_layout.addWidget(self.whatsapp_api_key_toggle)
+        whatsapp_api_key_layout.setContentsMargins(0, 0, 0, 0)
+        whatsapp_api_key_layout.setSpacing(0)
+        whatsapp_api_key_widget = QWidget()
+        whatsapp_api_key_widget.setLayout(whatsapp_api_key_layout)
         self.whatsapp_phone_numbers = QLineEdit(
             ", ".join(self.notification_manager.config["whatsapp"]["phone_numbers"])
         )
         self.whatsapp_phone_numbers.setPlaceholderText("+1234567890, +0987654321")
 
-        whatsapp_form.addRow("API Key:", self.whatsapp_api_key)
+        whatsapp_form.addRow("API Key:", whatsapp_api_key_widget)
         whatsapp_form.addRow("Phone Numbers:", self.whatsapp_phone_numbers)
         whatsapp_layout.addLayout(whatsapp_form)
 
@@ -294,10 +313,26 @@ class NotificationSettingsDialog(QDialog):
         sms_form = QFormLayout()
         self.sms_api_key = QLineEdit(self.notification_manager.config["sms"]["api_key"])
         self.sms_api_key.setPlaceholderText("Account SID:Auth Token")
+        self.sms_api_key.setEchoMode(QLineEdit.Password)
+        self.sms_api_key_toggle = QPushButton()
+        self.sms_api_key_toggle.setCheckable(True)
+        self.sms_api_key_toggle.setFixedWidth(28)
+        self.sms_api_key_toggle.setIcon(QIcon.fromTheme("view-password"))
+        self.sms_api_key_toggle.setToolTip("Show/Hide API Key")
+        self.sms_api_key_toggle.toggled.connect(
+            lambda checked: self.sms_api_key.setEchoMode(QLineEdit.Normal if checked else QLineEdit.Password)
+        )
+        sms_api_key_layout = QHBoxLayout()
+        sms_api_key_layout.addWidget(self.sms_api_key)
+        sms_api_key_layout.addWidget(self.sms_api_key_toggle)
+        sms_api_key_layout.setContentsMargins(0, 0, 0, 0)
+        sms_api_key_layout.setSpacing(0)
+        sms_api_key_widget = QWidget()
+        sms_api_key_widget.setLayout(sms_api_key_layout)
         self.sms_phone_numbers = QLineEdit("+919923706784, +919876543210")
         self.sms_phone_numbers.setPlaceholderText("+919923706784, +919876543210")
 
-        sms_form.addRow("API Key:", self.sms_api_key)
+        sms_form.addRow("API Key:", sms_api_key_widget)
         sms_form.addRow("Phone Numbers:", self.sms_phone_numbers)
         sms_layout.addLayout(sms_form)
 
@@ -334,6 +369,12 @@ class NotificationSettingsDialog(QDialog):
         button_layout.addWidget(self.cancel_btn)
         layout.addLayout(button_layout)
 
+        # Status label for feedback
+        self.status_label = QLabel()
+        self.status_label.setStyleSheet("font-size: 12px; margin-top: 6px;")
+        self.status_label.setText("")
+        layout.addWidget(self.status_label)
+
         # Dialog-level validation
         self.email_enabled.toggled.connect(self.validate)
         self.smtp_server.textChanged.connect(self.validate)
@@ -349,7 +390,41 @@ class NotificationSettingsDialog(QDialog):
         self.sms_phone_numbers.textChanged.connect(self.validate)
         self.validate()
 
+    def validate_email(self, email):
+        return re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email)
+    def validate_phone(self, phone):
+        return re.match(r"^\+?\d{10,15}$", phone)
+    def validate_api_key(self, key):
+        return ":" in key and len(key.split(":")) == 2
+    def validate_fields(self):
+        errors = []
+        # Email
+        if self.email_enabled.isChecked():
+            if not self.validate_email(self.sender_email.text()):
+                errors.append("Invalid sender email.")
+            for recipient in self.recipient_emails.text().split(","):
+                if recipient.strip() and not self.validate_email(recipient.strip()):
+                    errors.append(f"Invalid recipient email: {recipient.strip()}")
+        # WhatsApp
+        if self.whatsapp_enabled.isChecked():
+            if not self.validate_api_key(self.whatsapp_api_key.text()):
+                errors.append("Invalid WhatsApp API key format.")
+            for phone in self.whatsapp_phone_numbers.text().split(","):
+                if phone.strip() and not self.validate_phone(phone.strip()):
+                    errors.append(f"Invalid WhatsApp phone: {phone.strip()}")
+        # SMS
+        if self.sms_enabled.isChecked():
+            if not self.validate_api_key(self.sms_api_key.text()):
+                errors.append("Invalid SMS API key format.")
+            for phone in self.sms_phone_numbers.text().split(","):
+                if phone.strip() and not self.validate_phone(phone.strip()):
+                    errors.append(f"Invalid SMS phone: {phone.strip()}")
+        return errors
     def save_settings(self):
+        errors = self.validate_fields()
+        if errors:
+            QMessageBox.warning(self, "Validation Error", "\n".join(errors))
+            return
         """Save notification settings"""
         try:
             # Update email settings
@@ -420,30 +495,61 @@ class NotificationSettingsDialog(QDialog):
             QMessageBox.warning(parent, "Error", f"Failed to save settings: {str(e)}")
 
     def test_notifications(self):
-        """Test notification settings"""
+        """Test notification settings asynchronously"""
+        self.save_btn.setEnabled(False)
+        self.test_btn.setEnabled(False)
+        self.cancel_btn.setEnabled(False)
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        self.status_label.setStyleSheet("color: #1976d2; font-size: 12px; margin-top: 6px;")
+        self.status_label.setText("Sending notifications… Please wait.")
         try:
-            # Create a test medicine
             from db import Medicine
-
             test_medicine = Medicine(
                 name="Test Medicine",
                 barcode="TEST123",
                 quantity=5,
                 manufacturer="Test Manufacturer",
             )
-
-            results = self.notification_manager.send_all_alerts([test_medicine])
-
-            # Show results
-            message = "Test notification results:\n\n"
-            for channel, success, msg in results:
-                status = "✅ Success" if success else "❌ Failed"
-                message += f"{channel}: {status}\n{msg}\n\n"
-
-            QMessageBox.information(self, "Test Results", message)
-
+            self.worker = NotificationSendWorker(self.notification_manager, test_medicine)
+            self.worker.result_signal.connect(self.on_test_notifications_result)
+            self.worker.error_signal.connect(self.on_test_notifications_error)
+            self.worker.finished.connect(self.on_test_notifications_finished)
+            self.worker.start()
         except Exception as e:
+            QApplication.restoreOverrideCursor()
+            self.save_btn.setEnabled(True)
+            self.test_btn.setEnabled(True)
+            self.cancel_btn.setEnabled(True)
+            self.status_label.setStyleSheet("color: #d32f2f; font-size: 12px; margin-top: 6px;")
+            self.status_label.setText(f"Test failed: {str(e)}")
             QMessageBox.warning(self, "Error", f"Test failed: {str(e)}")
+
+    def on_test_notifications_result(self, results):
+        message = "Test notification results:\n\n"
+        all_success = True
+        for channel, success, msg in results:
+            status = "✅ Success" if success else "❌ Failed"
+            message += f"{channel}: {status}\n{msg}\n\n"
+            if not success:
+                all_success = False
+        if all_success:
+            self.status_label.setStyleSheet("color: #388e3c; font-size: 12px; margin-top: 6px;")
+            self.status_label.setText("Notifications sent successfully!")
+        else:
+            self.status_label.setStyleSheet("color: #d32f2f; font-size: 12px; margin-top: 6px;")
+            self.status_label.setText("Some notifications failed. See details below.")
+        QMessageBox.information(self, "Test Results", message)
+
+    def on_test_notifications_error(self, error):
+        self.status_label.setStyleSheet("color: #d32f2f; font-size: 12px; margin-top: 6px;")
+        self.status_label.setText(f"Test failed: {error}")
+        QMessageBox.warning(self, "Error", f"Test failed: {error}")
+
+    def on_test_notifications_finished(self):
+        QApplication.restoreOverrideCursor()
+        self.save_btn.setEnabled(True)
+        self.test_btn.setEnabled(True)
+        self.cancel_btn.setEnabled(True)
 
     def validate(self):
         valid = True
@@ -558,12 +664,28 @@ class NotificationSettingsWidget(QWidget):
             self.notification_manager.config["whatsapp"]["api_key"]
         )
         self.whatsapp_api_key.setPlaceholderText("Account SID:Auth Token (for Twilio)")
+        self.whatsapp_api_key.setEchoMode(QLineEdit.Password)
+        self.whatsapp_api_key_toggle = QPushButton()
+        self.whatsapp_api_key_toggle.setCheckable(True)
+        self.whatsapp_api_key_toggle.setFixedWidth(28)
+        self.whatsapp_api_key_toggle.setIcon(QIcon.fromTheme("view-password"))
+        self.whatsapp_api_key_toggle.setToolTip("Show/Hide API Key")
+        self.whatsapp_api_key_toggle.toggled.connect(
+            lambda checked: self.whatsapp_api_key.setEchoMode(QLineEdit.Normal if checked else QLineEdit.Password)
+        )
+        whatsapp_api_key_layout = QHBoxLayout()
+        whatsapp_api_key_layout.addWidget(self.whatsapp_api_key)
+        whatsapp_api_key_layout.addWidget(self.whatsapp_api_key_toggle)
+        whatsapp_api_key_layout.setContentsMargins(0, 0, 0, 0)
+        whatsapp_api_key_layout.setSpacing(0)
+        whatsapp_api_key_widget = QWidget()
+        whatsapp_api_key_widget.setLayout(whatsapp_api_key_layout)
         self.whatsapp_phone_numbers = QLineEdit(
             ", ".join(self.notification_manager.config["whatsapp"]["phone_numbers"])
         )
         self.whatsapp_phone_numbers.setPlaceholderText("+1234567890, +0987654321")
 
-        whatsapp_form.addRow("API Key:", self.whatsapp_api_key)
+        whatsapp_form.addRow("API Key:", whatsapp_api_key_widget)
         whatsapp_form.addRow("Phone Numbers:", self.whatsapp_phone_numbers)
         whatsapp_layout.addLayout(whatsapp_form)
 
@@ -594,10 +716,26 @@ class NotificationSettingsWidget(QWidget):
         sms_form = QFormLayout()
         self.sms_api_key = QLineEdit(self.notification_manager.config["sms"]["api_key"])
         self.sms_api_key.setPlaceholderText("Account SID:Auth Token")
+        self.sms_api_key.setEchoMode(QLineEdit.Password)
+        self.sms_api_key_toggle = QPushButton()
+        self.sms_api_key_toggle.setCheckable(True)
+        self.sms_api_key_toggle.setFixedWidth(28)
+        self.sms_api_key_toggle.setIcon(QIcon.fromTheme("view-password"))
+        self.sms_api_key_toggle.setToolTip("Show/Hide API Key")
+        self.sms_api_key_toggle.toggled.connect(
+            lambda checked: self.sms_api_key.setEchoMode(QLineEdit.Normal if checked else QLineEdit.Password)
+        )
+        sms_api_key_layout = QHBoxLayout()
+        sms_api_key_layout.addWidget(self.sms_api_key)
+        sms_api_key_layout.addWidget(self.sms_api_key_toggle)
+        sms_api_key_layout.setContentsMargins(0, 0, 0, 0)
+        sms_api_key_layout.setSpacing(0)
+        sms_api_key_widget = QWidget()
+        sms_api_key_widget.setLayout(sms_api_key_layout)
         self.sms_phone_numbers = QLineEdit("+919923706784, +919876543210")
         self.sms_phone_numbers.setPlaceholderText("+919923706784, +919876543210")
 
-        sms_form.addRow("API Key:", self.sms_api_key)
+        sms_form.addRow("API Key:", sms_api_key_widget)
         sms_form.addRow("Phone Numbers:", self.sms_phone_numbers)
         sms_layout.addLayout(sms_form)
 
@@ -1191,8 +1329,10 @@ class EditMedicineDialog(QDialog):
 
 
 class PharmacyDetailsWidget(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
+    details_saved = pyqtSignal()
+    def __init__(self, main_window, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._main_window_ref = weakref.ref(main_window)
         self.init_ui()
         self.load_existing_details()
 
@@ -1279,6 +1419,7 @@ class PharmacyDetailsWidget(QWidget):
         success, message = save_pharmacy_details(name, address, phone, email, gst_number, license_number, website)
         if success:
             QMessageBox.information(self, "Success", message)
+            self.details_saved.emit()
         else:
             QMessageBox.critical(self, "Error", f"Failed to save pharmacy details: {message}")
     def validate(self):

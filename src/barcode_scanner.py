@@ -8,15 +8,7 @@ from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtWidgets import QDialog, QLabel, QMessageBox, QPushButton, QVBoxLayout
 from pyzbar.pyzbar import decode
 
-log_dir = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "logs")
-if not _os.path.exists(log_dir):
-    _os.makedirs(log_dir)
-log_file = _os.path.join(log_dir, "medibit_app.log")
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    handlers=[RotatingFileHandler(log_file, maxBytes=2 * 1024 * 1024, backupCount=5)],
-)
+# Logging is configured in main_window.py
 barcode_logger = logging.getLogger("medibit.barcode")
 
 

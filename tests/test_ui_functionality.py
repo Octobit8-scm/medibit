@@ -73,9 +73,7 @@ def test_billing_ui_discounted_bill(app_and_window, sample_billing):
         item = window.billing_ui.billing_history_list.item(i)
         bill = item.data(Qt.UserRole)
         if hasattr(bill, 'items'):
-            print(f'Bill {i} items:')
             for line in bill.items:
-                print('  name:', getattr(line, 'name', None), 'discount:', getattr(line, 'discount', None))
                 if (
                     (getattr(line, 'name', None) in ["PainRelief", "Cough Syrup"]) and
                     (hasattr(line, 'discount') and getattr(line, 'discount', 0) > 0)
@@ -113,20 +111,13 @@ def test_add_inventory_item(app_and_window, monkeypatch, sample_inventory):
     # Patch inventory_service.add to print arguments and return value
     orig_add = window.inventory_service.add
     def debug_add(data):
-        print('inventory_service.add called with:', data)
         result = orig_add(data)
-        print('inventory_service.add returned:', result)
         return result
     monkeypatch.setattr(window.inventory_service, 'add', debug_add)
 
     qtbot.mouseClick(window.inventory_ui.add_medicine_btn, Qt.LeftButton)
     window.refresh_inventory_table()
     qtbot.wait(100)
-    print('Inventory table items:')
-    for row in range(window.inventory_ui.inventory_table.rowCount()):
-        item = window.inventory_ui.inventory_table.item(row, 1)
-        print(f'Row {row}:', item.text() if item else None)
-    found = False
     for row in range(window.inventory_ui.inventory_table.rowCount()):
         if window.inventory_ui.inventory_table.item(row, 1) and window.inventory_ui.inventory_table.item(row, 1).text() == "TestMed":
             found = True

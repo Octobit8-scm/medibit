@@ -4,13 +4,16 @@ import datetime
 import os
 from receipt_manager import ReceiptManager
 import logging
-logger = logging.getLogger("billing_service")
+logger = logging.getLogger("medibit")
 
 class BillingService:
     """
     Service class for all billing-related business logic and data access.
     UI should use this class instead of calling DB functions directly.
     """
+
+    def __init__(self):
+        logger.info("BillingService initialized")
 
     def create_bill(self, items: List[Dict[str, Any]], customer: Dict[str, Any]) -> Tuple[bool, Optional[str], Optional[int], Optional[list]]:
         """
@@ -61,21 +64,20 @@ class BillingService:
         from db import get_monthly_sales
         return get_monthly_sales(start_date, end_date)
 
-    def calculate_totals(self, items, tax_percent, discount_percent):
-        logger.info(f"Calculating totals: items={items}, tax_percent={tax_percent}, discount_percent={discount_percent}")
-        subtotal = 0
-        for item in items:
-            price = float(item.get('price', 0))
-            quantity = int(item.get('quantity', 0))
-            item_discount = float(item.get('discount', 0))
-            item_total = max(0, (price - item_discount)) * quantity
-            subtotal += item_total
-        discount_amount = subtotal * (discount_percent / 100)
-        discounted_subtotal = max(subtotal - discount_amount, 0)
-        tax_amount = discounted_subtotal * (tax_percent / 100)
-        total = discounted_subtotal + tax_amount
-        logger.info(f"Totals calculated: subtotal={subtotal}, discount_amount={discount_amount}, discounted_subtotal={discounted_subtotal}, tax_amount={tax_amount}, total={total}")
-        return subtotal, tax_amount, total
+    def calculate_totals(self, items, tax, discount):
+        logger.debug(f"[calculate_totals] ENTRY: items_count={len(items)}, tax={tax}%, discount={discount}%")
+        try:
+            subtotal = sum(item['price'] * item['quantity'] for item in items)
+            discount_amount = subtotal * (discount / 100)
+            discounted_subtotal = subtotal - discount_amount
+            tax_amount = discounted_subtotal * (tax / 100)
+            total = discounted_subtotal + tax_amount
+            logger.info("Totals calculated successfully.")
+            logger.debug(f"[calculate_totals] EXIT: subtotal={subtotal:.2f}, total={total:.2f}")
+            return subtotal, tax_amount, total
+        except Exception as e:
+            logger.error(f"[calculate_totals] Exception: {e}", exc_info=True)
+            raise
 
     def generate_receipt(self, timestamp: datetime.datetime, items: List[Dict[str, Any]], total: float, details: Dict[str, Any]) -> Optional[str]:
         """
@@ -123,6 +125,17 @@ Thank you for your purchase!
     def finalize_bill(self, items, customer, tax_percent, discount, pharmacy_details=None):
         import datetime
         logger.info(f"[START] finalize_bill: items={items}, customer={customer}, tax_percent={tax_percent}, discount={discount}, pharmacy_details={pharmacy_details}")
+        # Block finalization if customer name is missing
+        if not customer.get('name', '').strip():
+            logger.error("Cannot finalize bill: Customer name is required.")
+            return {
+                'success': False,
+                'error': 'Customer name is required to finalize the bill.',
+                'bill_id': None,
+                'send_results': None,
+                'pdf_path': None,
+                'totals': None
+            }
         timestamp = datetime.datetime.now()
         try:
             # Calculate totals

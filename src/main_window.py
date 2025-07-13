@@ -71,7 +71,7 @@ from dialogs import (
 from license_utils import verify_license_key
 from order_service import OrderService
 from receipt_manager import ReceiptManager
-from theme import get_stylesheet
+from theme import theme_manager
 from billing_ui import BillingUi
 from inventory_ui import InventoryUi
 from orders_ui import OrdersUi
@@ -85,22 +85,74 @@ from db import (
 )
 from alert_service import AlertService
 from settings_service import SettingsService
-from config import get_theme
+from config import get_theme, get_first_launch_shown, set_first_launch_shown
 from notifications import NotificationManager
+import sip
 
 log_dir = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "logs")
 if not _os.path.exists(log_dir):
     _os.makedirs(log_dir)
-log_file = _os.path.join(log_dir, "medibit_app.log")
+
+# Create log filename with timestamp
+from datetime import datetime as dt
+timestamp = dt.now().strftime("%Y-%m-%d_%H-%M-%S")
+log_file = _os.path.join(log_dir, f"medibit_app_{timestamp}.log")
+
+# Central logger setup for the entire application
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,  # Set to DEBUG to capture all log levels
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    handlers=[RotatingFileHandler(log_file, maxBytes=2 * 1024 * 1024, backupCount=5)],
+    handlers=[RotatingFileHandler(log_file, maxBytes=2 * 1024 * 1024, backupCount=5)]
 )
+# Add console handler for real-time feedback if not already present
+if not any(isinstance(h, logging.StreamHandler) for h in logging.getLogger().handlers):
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)
+    console_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    logging.getLogger().addHandler(console_handler)
 logger = logging.getLogger("medibit")
 
 # For drafts
 os.makedirs(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'drafts'), exist_ok=True)
+
+class WelcomePage(QWidget):
+    def __init__(self, pharmacy_name="Pharmacy", main_window=None):
+        super().__init__(main_window)
+        self.main_window = main_window
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignCenter)
+        self.setStyleSheet("font-size: 18px; color: #1976d2;")
+        self.name_label = QLabel(pharmacy_name)
+        self.name_label.setStyleSheet("font-size: 36px; font-weight: bold; margin-bottom: 24px;")
+        self.name_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.name_label)
+        app_label = QLabel("Welcome to Medibit Pharmacy Management System")
+        app_label.setStyleSheet("font-size: 24px; font-weight: bold; margin-bottom: 16px;")
+        app_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(app_label)
+        details = QLabel(
+            "Version 1.0\n\n"
+            "A comprehensive solution for pharmacy inventory, billing, orders, alerts, and sales.\n\n"
+            "Designed & Developed by Octobit8.\n\n"
+            "To get started, configure your pharmacy details in Settings."
+        )
+        details.setAlignment(Qt.AlignCenter)
+        details.setWordWrap(True)
+        layout.addWidget(details)
+        continue_btn = QPushButton("Continue")
+        continue_btn.setFixedWidth(200)
+        continue_btn.setStyleSheet("font-size: 18px; padding: 12px; margin-top: 32px;")
+        continue_btn.clicked.connect(self.handle_continue)
+        layout.addWidget(continue_btn)
+    def handle_continue(self):
+        if self.main_window:
+            self.main_window.show_main_app()
+    def set_pharmacy_name(self, name):
+        print(f"[WelcomePage] set_pharmacy_name called. QLabel id: {id(self.name_label)}, deleted: {sip.isdeleted(self.name_label)}")
+        if not sip.isdeleted(self.name_label):
+            self.name_label.setText(name)
+    def __del__(self):
+        print(f"[WelcomePage] __del__ called. id: {id(self)}")
 
 class MainWindow(QMainWindow):
     """
@@ -155,8 +207,21 @@ class MainWindow(QMainWindow):
         self.alert_service = AlertService()
         self.settings_service = SettingsService()
         self._init_menubar()
-        self.setStyleSheet(get_stylesheet())
-        self.init_ui()
+        self.setStyleSheet(theme_manager.get_main_window_stylesheet())
+        self.stacked_widget = QStackedWidget(self)
+        self.setCentralWidget(self.stacked_widget)
+        from db import get_pharmacy_details
+        details = get_pharmacy_details()
+        if details:
+            if isinstance(details, dict):
+                pharmacy_name = details.get("name", "Pharmacy").strip()
+            else:
+                pharmacy_name = getattr(details, "name", "Pharmacy").strip()
+        else:
+            pharmacy_name = "Pharmacy"
+        self.welcome_page = WelcomePage(pharmacy_name, main_window=self)
+        self.stacked_widget.addWidget(self.welcome_page)
+        self.stacked_widget.setCurrentWidget(self.welcome_page)
         self.showMaximized()
         # Status bar: only show developer name, no dynamic messages
         self.statusBar = QStatusBar()
@@ -164,7 +229,8 @@ class MainWindow(QMainWindow):
         dev_label = QLabel("Designed & Developed by Octobit8")
         dev_label.setStyleSheet("font-weight: bold; padding-right: 16px;")
         self.statusBar.addPermanentWidget(dev_label)
-        self.billing_ui.print_bill_btn.clicked.connect(self.print_latest_bill)
+    def __del__(self):
+        print(f"[MainWindow] __del__ called. id: {id(self)}")
 
     def _init_menubar(self) -> None:
         """
@@ -302,14 +368,11 @@ class MainWindow(QMainWindow):
         """
         self.inventory_ui = InventoryUi(self)
         # Connect buttons to MainWindow methods
-        self.inventory_ui.add_medicine_btn.clicked.connect(self.open_add_medicine_dialog)
+        # Note: add_medicine_btn is connected in InventoryUi._on_add_medicine
         self.inventory_ui.scan_barcode_btn.clicked.connect(self.open_barcode_scanner)
         self.inventory_ui.generate_order_btn.clicked.connect(self.generate_order)
-        self.inventory_ui.bulk_threshold_btn.clicked.connect(lambda: self.show_inventory_panel("threshold"))
-        self.inventory_ui.quick_add_stock_btn.clicked.connect(lambda: self.show_inventory_panel("quick_add"))
-        self.inventory_ui.delete_btn.clicked.connect(self.delete_selected_inventory_row)
         self.inventory_ui.clear_inventory_btn.clicked.connect(self.clear_inventory)
-        self.inventory_ui.inventory_search_box.textChanged.connect(self.inventory_ui.filter_inventory_table)
+        self.inventory_ui.search_box.textChanged.connect(self.inventory_ui.filter_inventory_table)
         self.inventory_ui.inventory_table.cellDoubleClicked.connect(self.on_inventory_cell_double_clicked)
         self.stacked_widget.addWidget(self.inventory_ui)
 
@@ -318,12 +381,12 @@ class MainWindow(QMainWindow):
         self.billing_ui.add_item_btn.clicked.connect(self.open_billing_add_medicine_dialog)
         self.billing_ui.finalize_bill_btn.clicked.connect(self.complete_sale)
         self.billing_ui.remove_item_btn.clicked.connect(self.remove_selected_billing_item)
-        self.billing_ui.download_bill_btn.clicked.connect(self.view_or_download_bill)
+        self.billing_ui.download_pdf_btn.clicked.connect(self.view_or_download_bill)
         self.billing_ui.save_draft_btn.clicked.connect(self.save_billing_draft)
         self.billing_ui.delete_draft_btn.clicked.connect(self.delete_selected_draft)
-        # Connect tax and discount spin changes to refresh totals
-        self.billing_ui.tax_spin.valueChanged.connect(self._refresh_billing_table)
-        self.billing_ui.discount_spin.valueChanged.connect(self._refresh_billing_table)
+        self.billing_ui.print_bill_btn.clicked.connect(self.print_latest_bill)
+        # Note: tax_spin and discount_spin don't exist in current BillingUi
+        # These will need to be added to the UI or handled differently
         self.stacked_widget.addWidget(self.billing_ui)
 
     def create_orders_page(self) -> None:
@@ -346,7 +409,7 @@ class MainWindow(QMainWindow):
         """
         View or download the selected bill from recent bills, or resume a draft.
         """
-        selected_items = self.billing_ui.billing_history_list.selectedItems()
+        selected_items = self.billing_ui.recent_bills_list.selectedItems()
         if not selected_items:
             QMessageBox.information(self, "No Bill Selected", "Please select a bill to view or download.")
             return
@@ -492,8 +555,8 @@ class MainWindow(QMainWindow):
                 self.inventory_service.update(barcode, data)
                 self.inventory_ui.refresh_inventory_table()
                 # Automatically send low stock alerts after manual inventory update
-                success, msg = self.alert_service.send_all_alerts()
-                logger.info(f"[AutoAlert] After manual inventory update: success={success}, msg={msg}")
+                # Note: Alert sending is handled separately when needed
+                logger.info("[AutoAlert] Inventory updated successfully")
 
     def open_add_medicine_dialog(self) -> None:
         """
@@ -566,7 +629,7 @@ class MainWindow(QMainWindow):
         """
         self.settings_service.set_theme(theme)
         self.theme = theme
-        self.setStyleSheet(get_stylesheet())
+        self.setStyleSheet(theme_manager.get_main_window_stylesheet())
         # Update all text styles
         self.update_all_text_styles()
 
@@ -732,9 +795,10 @@ class MainWindow(QMainWindow):
 
     def update_pharmacy_name_label(self) -> None:
         """
-        Update the pharmacy name label with the latest name from settings.
+        Update the pharmacy name label with the latest name from settings and update the WelcomePage as well.
         """
         try:
+            from db import get_pharmacy_details
             details = get_pharmacy_details()
             if details:
                 if isinstance(details, dict):
@@ -745,9 +809,18 @@ class MainWindow(QMainWindow):
                 pharmacy_name = ""
             if not pharmacy_name:
                 pharmacy_name = "Pharmacy"
-            self.pharmacy_name_label.setText(pharmacy_name)
+            print(f"[MainWindow] update_pharmacy_name_label called. QLabel id: {id(getattr(self, 'pharmacy_name_label', None))}, deleted: {sip.isdeleted(getattr(self, 'pharmacy_name_label', None)) if hasattr(self, 'pharmacy_name_label') else 'N/A'}")
+            if hasattr(self, 'pharmacy_name_label') and self.pharmacy_name_label and not sip.isdeleted(self.pharmacy_name_label):
+                self.pharmacy_name_label.setText(pharmacy_name)
+            print(f"[MainWindow] update_pharmacy_name_label WelcomePage id: {id(getattr(self, 'welcome_page', None))}, deleted: {sip.isdeleted(getattr(self, 'welcome_page', None)) if hasattr(self, 'welcome_page') else 'N/A'}")
+            if hasattr(self, "welcome_page") and self.welcome_page and not sip.isdeleted(self.welcome_page):
+                self.welcome_page.set_pharmacy_name(pharmacy_name)
         except Exception as e:
-            self.pharmacy_name_label.setText("Pharmacy")
+            print(f"[MainWindow] Exception in update_pharmacy_name_label: {e}")
+            if hasattr(self, 'pharmacy_name_label') and self.pharmacy_name_label and not sip.isdeleted(self.pharmacy_name_label):
+                self.pharmacy_name_label.setText("Pharmacy")
+            if hasattr(self, "welcome_page") and self.welcome_page and not sip.isdeleted(self.welcome_page):
+                self.welcome_page.set_pharmacy_name("Pharmacy")
 
     def open_pharmacy_details(self) -> None:
         dialog = PharmacyDetailsDialog(self)
@@ -882,8 +955,8 @@ class MainWindow(QMainWindow):
         """
         logger.info("[UI] _refresh_billing_history called")
         # Clear layout
-        for i in reversed(range(self.billing_ui.billing_history_list.count())):
-            self.billing_ui.billing_history_list.takeItem(i)
+        for i in reversed(range(self.billing_ui.recent_bills_list.count())):
+            self.billing_ui.recent_bills_list.takeItem(i)
 
         import os, json, re, glob
         try:
@@ -924,7 +997,7 @@ class MainWindow(QMainWindow):
                 logger.info(f"[UI] Adding draft to history: {label}, pdf_path={pdf_path}")
                 item = QListWidgetItem(label)
                 item.setData(Qt.UserRole, {'is_draft': True, 'draft': draft, 'draft_path': path, 'pdf_path': pdf_path})
-                self.billing_ui.billing_history_list.addItem(item)
+                self.billing_ui.recent_bills_list.addItem(item)
                 draft_count += 1
             logger.info(f"[UI] Finished drafts loop, added {draft_count} drafts")
         except Exception as e:
@@ -955,7 +1028,7 @@ class MainWindow(QMainWindow):
                 sys.stdout.flush()
                 item = QListWidgetItem(label)
                 item.setData(Qt.UserRole, bill)
-                self.billing_ui.billing_history_list.addItem(item)
+                self.billing_ui.recent_bills_list.addItem(item)
                 bill_count += 1
             logger.info(f"[UI] Finished bills loop, added {bill_count} bills")
         except Exception as e:
@@ -1224,7 +1297,6 @@ class MainWindow(QMainWindow):
                     border-radius: 4px;
                     padding: 8px 16px;
                     font-weight: bold;
-                    transition: all 0.1s;
                 }
                 QPushButton:hover {
                     background-color: #505050;
@@ -1232,7 +1304,6 @@ class MainWindow(QMainWindow):
                 }
                 QPushButton:pressed {
                     background-color: #303030;
-                    transform: scale(0.97);
                 }
                 QPushButton:disabled {
                     background-color: #2B2B2B;
@@ -1249,7 +1320,6 @@ class MainWindow(QMainWindow):
                     border-radius: 4px;
                     padding: 8px 16px;
                     font-weight: bold;
-                    transition: all 0.1s;
                 }
                 QPushButton:hover {
                     background-color: #F8F8F8;
@@ -1258,7 +1328,6 @@ class MainWindow(QMainWindow):
                 }
                 QPushButton:pressed {
                     background-color: #B3B3B3;
-                    transform: scale(0.97);
                 }
                 QPushButton:disabled {
                     background-color: #F8F8F8;
@@ -1594,7 +1663,7 @@ class MainWindow(QMainWindow):
         settings_service = SettingsService()
         key = settings_service.get_license_key()
         install_date = settings_service.get_installation_date()
-        print(f"[DEBUG] check_license called with key: {key}, install_date: {install_date}")
+        # print(f"[DEBUG] check_license called with key: {key}, install_date: {install_date}")
         if not key or not install_date:
             # Set installation_date to today if missing
             today_str = datetime.datetime.now().strftime("%Y-%m-%d")
@@ -1844,7 +1913,7 @@ class MainWindow(QMainWindow):
         Delete the selected draft file from the drafts directory.
         """
         from PyQt5.QtWidgets import QMessageBox
-        selected_items = self.billing_ui.billing_history_list.selectedItems()
+        selected_items = self.billing_ui.recent_bills_list.selectedItems()
         if not selected_items:
             QMessageBox.warning(self, "No Selection", "Please select a draft to delete.")
             return
@@ -1938,3 +2007,6 @@ class MainWindow(QMainWindow):
         btn_pdf.clicked.connect(do_save_pdf)
         btn_cancel.clicked.connect(dialog.reject)
         dialog.exec_()
+
+    def show_main_app(self):
+        self.init_ui()

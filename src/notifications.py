@@ -9,15 +9,7 @@ from logging.handlers import RotatingFileHandler
 
 import requests
 
-log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
-if not os.path.exists(log_dir):
-    os.makedirs(log_dir)
-log_file = os.path.join(log_dir, "medibit_app.log")
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    handlers=[RotatingFileHandler(log_file, maxBytes=2 * 1024 * 1024, backupCount=5)],
-)
+# Logging is configured in main_window.py
 notif_logger = logging.getLogger("medibit.notifications")
 
 
@@ -72,6 +64,7 @@ class NotificationManager:
     def send_email_alert(self, low_stock_medicines):
         """Send email alert for low stock medicines"""
         if not self.config["email"]["enabled"]:
+            notif_logger.info(f"[Email] Attempted to send but email notifications are disabled at {datetime.now()}")
             return False, "Email notifications are disabled"
 
         try:
@@ -112,12 +105,14 @@ class NotificationManager:
                 server.send_message(msg)
 
             server.quit()
+            notif_logger.info(f"[Email] Alert sent to {self.config['email']['recipient_emails']} at {datetime.now()}")
             return (
                 True,
                 f"Email alert sent to {len(self.config['email']['recipient_emails'])} recipients",
             )
 
         except smtplib.SMTPAuthenticationError as e:
+            notif_logger.error(f"[Email] Authentication failed at {datetime.now()}: {str(e)}")
             if "534" in str(e) and "application specific password" in str(e).lower():
                 return (
                     False,
@@ -127,11 +122,13 @@ class NotificationManager:
             else:
                 return False, f"Email authentication failed: {str(e)}"
         except Exception as e:
+            notif_logger.error(f"[Email] Alert failed at {datetime.now()}: {str(e)}")
             return False, f"Email alert failed: {str(e)}"
 
     def send_whatsapp_alert(self, low_stock_medicines):
         """Send WhatsApp alert for low stock medicines using Twilio"""
         if not self.config["whatsapp"]["enabled"]:
+            notif_logger.info(f"[WhatsApp] Attempted to send but WhatsApp notifications are disabled at {datetime.now()}")
             return False, "WhatsApp notifications are disabled"
 
         try:
@@ -182,9 +179,12 @@ class NotificationManager:
 
                     if response.status_code in [200, 201]:
                         success_count += 1
+                        notif_logger.info(f"[WhatsApp] Alert sent to {phone} at {datetime.now()}")
+                    else:
+                        notif_logger.error(f"[WhatsApp] Failed to send to {phone} at {datetime.now()}: {response.text}")
 
                 except Exception as e:
-                    pass
+                    notif_logger.error(f"[WhatsApp] Exception sending to {phone} at {datetime.now()}: {str(e)}")
 
             if success_count > 0:
                 return True, f"WhatsApp alert sent to {success_count} recipients"
@@ -192,11 +192,13 @@ class NotificationManager:
                 return False, "WhatsApp alert failed for all recipients"
 
         except Exception as e:
+            notif_logger.error(f"[WhatsApp] Alert failed at {datetime.now()}: {str(e)}")
             return False, f"WhatsApp alert failed: {str(e)}"
 
     def send_sms_alert(self, low_stock_medicines):
         """Send SMS alert for low stock medicines using Twilio"""
         if not self.config["sms"]["enabled"]:
+            notif_logger.info(f"[SMS] Attempted to send but SMS notifications are disabled at {datetime.now()}")
             return False, "SMS notifications are disabled"
 
         try:
@@ -242,9 +244,12 @@ class NotificationManager:
 
                     if response.status_code in [200, 201]:
                         success_count += 1
+                        notif_logger.info(f"[SMS] Alert sent to {phone} at {datetime.now()}")
+                    else:
+                        notif_logger.error(f"[SMS] Failed to send to {phone} at {datetime.now()}: {response.text}")
 
                 except Exception as e:
-                    pass
+                    notif_logger.error(f"[SMS] Exception sending to {phone} at {datetime.now()}: {str(e)}")
 
             if success_count > 0:
                 return True, f"SMS alert sent to {success_count} recipients"
@@ -252,25 +257,29 @@ class NotificationManager:
                 return False, "SMS alert failed for all recipients"
 
         except Exception as e:
+            notif_logger.error(f"[SMS] Alert failed at {datetime.now()}: {str(e)}")
             return False, f"SMS alert failed: {str(e)}"
 
     def send_all_alerts(self, low_stock_medicines):
-        """Send alerts through all enabled channels"""
+        """Send alerts through all enabled channels and log summary"""
         results = []
 
         # Send email alert
         if self.config["email"]["enabled"]:
             success, message = self.send_email_alert(low_stock_medicines)
+            notif_logger.info(f"[Audit] Email: {message} (Success: {success}) at {datetime.now()}")
             results.append(("Email", success, message))
 
         # Send WhatsApp alert
         if self.config["whatsapp"]["enabled"]:
             success, message = self.send_whatsapp_alert(low_stock_medicines)
+            notif_logger.info(f"[Audit] WhatsApp: {message} (Success: {success}) at {datetime.now()}")
             results.append(("WhatsApp", success, message))
 
         # Send SMS alert
         if self.config["sms"]["enabled"]:
             success, message = self.send_sms_alert(low_stock_medicines)
+            notif_logger.info(f"[Audit] SMS: {message} (Success: {success}) at {datetime.now()}")
             results.append(("SMS", success, message))
 
         return results

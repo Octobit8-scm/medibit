@@ -10,15 +10,7 @@ if not os.path.exists(CONFIG_DIR):
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
 DEFAULT_THRESHOLD = 10
 
-log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
-if not os.path.exists(log_dir):
-    os.makedirs(log_dir)
-log_file = os.path.join(log_dir, "medibit_app.log")
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    handlers=[RotatingFileHandler(log_file, maxBytes=2 * 1024 * 1024, backupCount=5)],
-)
+# Logging is configured in main_window.py
 config_logger = logging.getLogger("medibit.config")
 
 
@@ -196,3 +188,39 @@ def set_installation_date(date_str: str):
             json.dump(data, f)
     except Exception as e:
         config_logger.error(f"Failed to write config in set_installation_date: {e}")
+
+
+def get_first_launch_shown() -> bool:
+    """
+    Get the first launch shown flag.
+    Returns:
+        bool: True if welcome page has been shown, False otherwise.
+    """
+    if not os.path.exists(CONFIG_FILE):
+        return False
+    try:
+        with open(CONFIG_FILE, "r") as f:
+            data = json.load(f)
+        return data.get("first_launch_shown", False)
+    except Exception:
+        return False
+
+def set_first_launch_shown(value: bool):
+    """
+    Set the first launch shown flag.
+    Args:
+        value (bool): The new value for the flag.
+    """
+    data = {}
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, "r") as f:
+                data = json.load(f)
+        except Exception:
+            data = {}
+    data["first_launch_shown"] = value
+    try:
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(data, f)
+    except Exception:
+        pass

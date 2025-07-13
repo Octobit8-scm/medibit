@@ -12,16 +12,9 @@ from config import get_threshold
 
 Base = declarative_base()
 
-log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
-if not os.path.exists(log_dir):
-    os.makedirs(log_dir)
-log_file = os.path.join(log_dir, "medibit_app.log")
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    handlers=[RotatingFileHandler(log_file, maxBytes=2 * 1024 * 1024, backupCount=5)],
-)
+# Logging is configured in main_window.py
 db_logger = logging.getLogger("medibit.db")
+logger = logging.getLogger("medibit")
 
 
 class Medicine(Base):
@@ -155,7 +148,6 @@ def init_db() -> None:
             session = Session()
             session.query(PharmacyDetails).first()
             session.close()
-            print("Pharmacy details table exists and is accessible")
         except Exception as e:
             # pharmacy_details table doesn't exist, create it
             print(f"Creating pharmacy_details table... Error: {e}")
@@ -476,10 +468,8 @@ def get_pharmacy_details() -> 'PharmacyDetails':
     try:
         details = session.query(PharmacyDetails).first()
         session.close()
-        print(f"Retrieved pharmacy details: {details}")
         return details
     except Exception as e:
-        print(f"Error getting pharmacy details: {e}")
         session.close()
         return None
 
@@ -511,7 +501,6 @@ def save_pharmacy_details(
             existing.gst_number = gst_number
             existing.license_number = license_number
             existing.website = website
-            print(f"Updated existing pharmacy details: {existing.name}")
         else:
             # Create new pharmacy details
             details = PharmacyDetails(
@@ -524,13 +513,11 @@ def save_pharmacy_details(
                 website=website,
             )
             session.add(details)
-            print(f"Created new pharmacy details: {details.name}")
 
         session.commit()
         return True, "Pharmacy details saved successfully"
     except Exception as e:
         session.rollback()
-        print(f"Error saving pharmacy details: {e}")
         return False, str(e)
     finally:
         session.close()
@@ -556,12 +543,10 @@ def create_default_pharmacy_details() -> bool:
             )
             session.add(default_details)
             session.commit()
-            print("Created default pharmacy details")
             return True
         return False
     except Exception as e:
         session.rollback()
-        print(f"Error creating default pharmacy details: {e}")
         return False
     finally:
         session.close()
@@ -618,7 +603,6 @@ def clear_all_bills() -> None:
         return True
     except Exception as e:
         session.rollback()
-        print(f"Error clearing all bills: {e}")
         return False
     finally:
         session.close()
@@ -641,7 +625,6 @@ def update_order_status(order_id: int, status: str) -> bool:
         return False
     except Exception as e:
         session.rollback()
-        print(f"Error updating order status: {e}")
         return False
     finally:
         session.close()
@@ -658,10 +641,9 @@ def update_bill_file_path(bill_id: int, file_path: str) -> None:
     if bill:
         bill.file_path = file_path
         session.commit()
-        print(f"[DEBUG] Updated bill {bill_id} with file_path: {file_path}")
         session.expire_all()  # Force session refresh
     else:
-        print(f"[DEBUG] Bill {bill_id} not found for file_path update!")
+        pass # Removed debug print
     session.close()
 
 
@@ -732,5 +714,3 @@ def update_order_file_path(order_id: int, file_path: str) -> None:
     order.file_path = file_path
     session.commit()
     session.close()
-
-print(f"[DEBUG] Using DB file: {os.path.abspath(DB_FILENAME)}")
