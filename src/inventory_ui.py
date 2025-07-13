@@ -303,6 +303,7 @@ class InventoryUi(QWidget):
         self.search_box.setToolTip("Search medicines by barcode, name, or manufacturer.")
         self.search_box.setAccessibleName("Search Box")
         self.search_box.textChanged.connect(self.filter_inventory)
+        self.search_box.returnPressed.connect(self.filter_inventory_exact)
         basic_search_layout.addWidget(self.search_box)
         
         # Action buttons
@@ -532,6 +533,63 @@ class InventoryUi(QWidget):
         from PyQt5.QtWidgets import QApplication
         QApplication.processEvents()
     
+    def filter_inventory_exact(self):
+        """Filter inventory to show only exact matches when Enter is pressed."""
+        query = self.search_box.text().strip().lower()
+        if not query:
+            self.filter_inventory_table()
+            return
+        all_meds = self.inventory_service.get_all()
+        filtered = [
+            m for m in all_meds
+            if query == m.name.lower() or query == m.barcode.lower() or (m.manufacturer and query == m.manufacturer.lower())
+        ]
+        # Apply advanced filters
+        filtered = self.apply_advanced_filters(filtered)
+        self.inventory_table.setSortingEnabled(False)
+        self.inventory_table.clearContents()
+        self.inventory_table.setRowCount(len(filtered))
+        self.inventory_table.blockSignals(True)
+        from datetime import date
+        for i, med in enumerate(filtered):
+            self.inventory_table.setItem(i, 0, QTableWidgetItem(med.barcode))
+            name_text = med.name
+            if hasattr(med, 'threshold') and med.quantity <= med.threshold:
+                name_text += " 🔴"
+            if med.expiry and med.expiry <= date.today():
+                name_text += " ⚠️"
+            elif med.expiry and (med.expiry - date.today()).days <= 30:
+                name_text += " 🟡"
+            name_item = QTableWidgetItem(name_text)
+            self.inventory_table.setItem(i, 1, name_item)
+            quantity_item = QTableWidgetItem(str(med.quantity))
+            quantity_item.setTextAlignment(Qt.AlignCenter)
+            if hasattr(med, 'threshold') and med.quantity <= med.threshold:
+                quantity_item.setBackground(QColor(255, 200, 200))
+            self.inventory_table.setItem(i, 2, quantity_item)
+            threshold_item = QTableWidgetItem(str(getattr(med, 'threshold', 10)))
+            threshold_item.setTextAlignment(Qt.AlignCenter)
+            self.inventory_table.setItem(i, 3, threshold_item)
+            expiry_text = str(med.expiry) if med.expiry else "N/A"
+            expiry_item = QTableWidgetItem(expiry_text)
+            expiry_item.setTextAlignment(Qt.AlignCenter)
+            if med.expiry:
+                if med.expiry <= date.today():
+                    expiry_item.setBackground(QColor(255, 150, 150))
+                elif (med.expiry - date.today()).days <= 30:
+                    expiry_item.setBackground(QColor(255, 255, 150))
+            self.inventory_table.setItem(i, 4, expiry_item)
+            self.inventory_table.setItem(i, 5, QTableWidgetItem(med.manufacturer or "N/A"))
+            price_item = QTableWidgetItem(f"₹{getattr(med, 'price', 0)}")
+            price_item.setTextAlignment(Qt.AlignCenter)
+            self.inventory_table.setItem(i, 6, price_item)
+        self.inventory_table.blockSignals(False)
+        self.inventory_table.setSortingEnabled(True)
+        self.inventory_table.viewport().update()
+        self.inventory_table.repaint()
+        from PyQt5.QtWidgets import QApplication
+        QApplication.processEvents()
+
     def apply_advanced_filters(self, medicines):
         """Apply advanced filters to the medicine list."""
         from datetime import date

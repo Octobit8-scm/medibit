@@ -1607,14 +1607,13 @@ class MainWindow(QMainWindow):
             QPushButton,
             QVBoxLayout,
         )
-
         key = self.settings_service.get_license_key()
         if not key:
             QMessageBox.warning(self, "No License", "No license key found.")
             return
+        install_date = self.settings_service.get_installation_date()
         if key == "TRIAL-000000000000":
             email = "Trial User"
-            install_date = self.settings_service.get_installation_date()
             if install_date:
                 install_dt = datetime.datetime.strptime(install_date, "%Y-%m-%d")
                 days_used = (datetime.datetime.now() - install_dt).days
@@ -1625,32 +1624,24 @@ class MainWindow(QMainWindow):
                 exp = "Unknown"
             info = f"License Type: Trial\nExpires: {exp}\nDays left: {days_left}"
         else:
-            valid, data, err = verify_license_key(key)
-            if not valid:
-                info = f"Invalid license: {err}"
-                email = "Unknown"
-                exp = "Unknown"
-                days_left = "Unknown"
+            if install_date:
+                install_dt = datetime.datetime.strptime(install_date, "%Y-%m-%d")
+                days_used = (datetime.datetime.now() - install_dt).days
+                days_left = max(0, 30 - days_used)
+                exp = (install_dt + datetime.timedelta(days=30)).strftime("%Y-%m-%d")
             else:
-                email = data.get("email", "Unknown")
-                exp = data.get("exp", "Unknown")
-                if exp != "Unknown":
-                    exp_date = datetime.datetime.strptime(exp, "%Y-%m-%d").date()
-                    days_left = (exp_date - datetime.datetime.now().date()).days
-                else:
-                    days_left = "Unknown"
-                info = f"Customer Email: {email}\nExpires: {exp}\nDays left: {days_left}"
+                days_left = "Unknown"
+                exp = "Unknown"
+            info = f"License Type: Product\nExpires: {exp}\nDays left: {days_left}"
         dialog = QDialog(self)
         dialog.setWindowTitle("License Information")
         layout = QVBoxLayout(dialog)
         layout.addWidget(QLabel(info))
         update_btn = QPushButton("Update License Key")
         layout.addWidget(update_btn)
-
         def update_license():
             dialog.close()
             self.prompt_license_dialog(parent=self)
-
         update_btn.clicked.connect(update_license)
         close_btn = QPushButton("Close")
         close_btn.clicked.connect(dialog.accept)
@@ -1663,58 +1654,41 @@ class MainWindow(QMainWindow):
         settings_service = SettingsService()
         key = settings_service.get_license_key()
         install_date = settings_service.get_installation_date()
-        # print(f"[DEBUG] check_license called with key: {key}, install_date: {install_date}")
         if not key or not install_date:
-            # Set installation_date to today if missing
             today_str = datetime.datetime.now().strftime("%Y-%m-%d")
             settings_service.set_installation_date(today_str)
             install_date = today_str
+        install_dt = datetime.datetime.strptime(install_date, "%Y-%m-%d")
         # Trial license logic
         if key == "TRIAL-000000000000":
-            try:
-                install_dt = datetime.datetime.strptime(install_date, "%Y-%m-%d")
-                days_used = (datetime.datetime.now() - install_dt).days
-                if days_used > 7:
-                    return False
-                elif days_used >= 6:
-                    from PyQt5.QtWidgets import QMessageBox
-
-                    QMessageBox.warning(
-                        None,
-                        "Trial Expiring",
-                        f"Your trial license will expire in {7 - days_used} day(s). Please activate a full license.",
-                    )
-            except Exception:
+            days_used = (datetime.datetime.now() - install_dt).days
+            if days_used > 7:
                 return False
-            return True
-        # HMAC license key logic
-        valid, data, err = verify_license_key(key)
-        if not valid:
-            from PyQt5.QtWidgets import QMessageBox
-
-            if err == "License expired":
-                QMessageBox.critical(
-                    None,
-                    "License Expired",
-                    "Your license has expired. Please contact support.",
-                )
-            else:
-                QMessageBox.critical(None, "Invalid License", f"License error: {err}")
-            return False
-        # Optionally show customer info or expiry warning
-        exp = data.get("exp")
-        email = data.get("email")
-        if exp:
-            exp_date = datetime.datetime.strptime(exp, "%Y-%m-%d").date()
-            days_left = (exp_date - datetime.datetime.now().date()).days
-            if days_left <= 7:
+            elif days_used >= 6:
                 from PyQt5.QtWidgets import QMessageBox
-
                 QMessageBox.warning(
                     None,
-                    "License Expiring Soon",
-                    f"License for {email} expires in {days_left} day(s). Please renew.",
+                    "Trial Expiring",
+                    f"Your trial license will expire in {7 - days_used} day(s). Please activate a full license.",
                 )
+            return True
+        # Product license: valid for 1 month from installation
+        days_used = (datetime.datetime.now() - install_dt).days
+        if days_used > 30:
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.critical(
+                None,
+                "License Expired",
+                "Your license has expired after 1 month. Please renew.",
+            )
+            return False
+        elif days_used >= 23:
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.warning(
+                None,
+                "License Expiring Soon",
+                f"Your license will expire in {30 - days_used} day(s). Please renew.",
+            )
         return True
 
     @staticmethod

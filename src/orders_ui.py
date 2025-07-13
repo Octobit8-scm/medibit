@@ -218,7 +218,7 @@ class CreateOrderDialog(QDialog):
         self.accept()
 
 class OrderDetailsDialog(QDialog):
-    def __init__(self, order, parent=None):
+    def __init__(self, order, parent=None, supplier=None):
         super().__init__(parent)
         self.setWindowTitle(f"Order Details - ID {order.id}")
         self.setMinimumWidth(600)
@@ -233,14 +233,16 @@ class OrderDetailsDialog(QDialog):
         meta_layout.addRow("Status:", QLabel(order.status))
         meta_layout.addRow("PDF Path:", QLabel(order.file_path))
         layout.addWidget(meta_group)
-        # Supplier info (from first medicine)
-        if order.meds:
-            supplier = order.meds[0].manufacturer or ""
+        # Supplier info (prefer explicit supplier argument)
+        if supplier is not None:
+            supplier_name = supplier
+        elif order.meds:
+            supplier_name = order.meds[0].manufacturer or ""
         else:
-            supplier = ""
+            supplier_name = ""
         supplier_group = QGroupBox("Supplier Info")
         supplier_layout = QFormLayout(supplier_group)
-        supplier_layout.addRow("Supplier:", QLabel(supplier))
+        supplier_layout.addRow("Supplier:", QLabel(supplier_name))
         layout.addWidget(supplier_group)
         # Medicines table
         meds_group = QGroupBox("Medicines")
@@ -291,7 +293,7 @@ class OrdersUi(QWidget):
         title.setToolTip("Section: Order Management")
         title.setAccessibleName("Order Management Title")
         header_layout.addWidget(title)
-        header_layout.addStretch()
+        # Add action buttons to header
         self.create_order_btn = create_animated_button("Create Order", self)
         self.create_order_btn.setMinimumHeight(40)
         self.create_order_btn.setToolTip("Create a new order for medicines. (Ctrl+N)")
@@ -299,6 +301,30 @@ class OrdersUi(QWidget):
         self.create_order_btn.setFocusPolicy(Qt.StrongFocus)
         self.create_order_btn.clicked.connect(self.open_create_order_dialog)
         header_layout.addWidget(self.create_order_btn)
+        self.view_order_btn = create_animated_button("View Order", self)
+        self.view_order_btn.setToolTip("View details of the selected order.")
+        self.view_order_btn.setAccessibleName("View Order Button")
+        self.view_order_btn.setFocusPolicy(Qt.StrongFocus)
+        header_layout.addWidget(self.view_order_btn)
+        self.delete_order_btn = create_animated_button("Delete Order", self)
+        self.delete_order_btn.setToolTip("Delete the selected order.")
+        self.delete_order_btn.setAccessibleName("Delete Order Button")
+        self.delete_order_btn.setFocusPolicy(Qt.StrongFocus)
+        self.delete_order_btn.clicked.connect(self.delete_selected_order)
+        header_layout.addWidget(self.delete_order_btn)
+        self.delete_selected_btn = create_animated_button("Delete Selected", self)
+        self.delete_selected_btn.setToolTip("Delete all selected orders. (Del)")
+        self.delete_selected_btn.setAccessibleName("Delete Selected Orders Button")
+        self.delete_selected_btn.setFocusPolicy(Qt.StrongFocus)
+        self.delete_selected_btn.clicked.connect(self.delete_selected_orders)
+        header_layout.addWidget(self.delete_selected_btn)
+        self.send_order_btn = create_animated_button("Send Order", self)
+        self.send_order_btn.setToolTip("Send the selected order to supplier via Email and WhatsApp.")
+        self.send_order_btn.setAccessibleName("Send Order Button")
+        self.send_order_btn.setFocusPolicy(Qt.StrongFocus)
+        self.send_order_btn.clicked.connect(self.send_order_to_supplier)
+        header_layout.addWidget(self.send_order_btn)
+        header_layout.addStretch()
         layout.addLayout(header_layout)
         # Status Filter
         filter_layout = QHBoxLayout()
@@ -333,12 +359,11 @@ class OrdersUi(QWidget):
         table_title.setToolTip("Section: Orders")
         table_title.setAccessibleName("Orders Title")
         table_layout.addWidget(table_title)
-        self.orders_table = QTableWidget(0, 6)
+        self.orders_table = QTableWidget(0, 7)  # Add extra column for Completed button
         self.orders_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.orders_table.setSelectionMode(QTableWidget.MultiSelection)
         self.orders_table.setHorizontalHeaderLabels([
-            "Order ID", "Date", "Supplier", "Items", "Total", "Status"
-        ])
+            "Order ID", "Date", "Supplier", "Items", "Total", "Status", ""])
         self.orders_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.orders_table.setStyleSheet(theme_manager.get_table_stylesheet())
         self.orders_table.setToolTip("Table showing all orders.")
@@ -346,32 +371,13 @@ class OrdersUi(QWidget):
         self.orders_table.setProperty("aria-role", "table")
         self.orders_table.setFocusPolicy(Qt.StrongFocus)
         self.orders_table.setTabKeyNavigation(True)
+        # Make the orders table editable
+        from PyQt5.QtWidgets import QAbstractItemView, QPushButton
+        self.orders_table.setEditTriggers(QAbstractItemView.DoubleClicked | QAbstractItemView.SelectedClicked | QAbstractItemView.EditKeyPressed)
         self.orders_table.itemSelectionChanged.connect(self.update_action_buttons)
         self.orders_table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.orders_table.customContextMenuRequested.connect(self.show_context_menu)
         table_layout.addWidget(self.orders_table)
-        # Table action buttons
-        table_btn_layout = QHBoxLayout()
-        self.view_order_btn = create_animated_button("View Order", self)
-        self.view_order_btn.setToolTip("View details of the selected order.")
-        self.view_order_btn.setAccessibleName("View Order Button")
-        self.view_order_btn.setFocusPolicy(Qt.StrongFocus)
-        # Note: view_order method doesn't exist, will be handled by MainWindow
-        self.delete_order_btn = create_animated_button("Delete Order", self)
-        self.delete_order_btn.setToolTip("Delete the selected order.")
-        self.delete_order_btn.setAccessibleName("Delete Order Button")
-        self.delete_order_btn.setFocusPolicy(Qt.StrongFocus)
-        self.delete_order_btn.clicked.connect(self.delete_selected_order)
-        self.delete_selected_btn = create_animated_button("Delete Selected", self)
-        self.delete_selected_btn.setToolTip("Delete all selected orders. (Del)")
-        self.delete_selected_btn.setAccessibleName("Delete Selected Orders Button")
-        self.delete_selected_btn.setFocusPolicy(Qt.StrongFocus)
-        self.delete_selected_btn.clicked.connect(self.delete_selected_orders)
-        table_btn_layout.addWidget(self.view_order_btn)
-        table_btn_layout.addWidget(self.delete_order_btn)
-        table_btn_layout.addWidget(self.delete_selected_btn)
-        table_btn_layout.addStretch()
-        table_layout.addLayout(table_btn_layout)
         layout.addWidget(table_frame)
         # Pagination controls
         pagination_layout = QHBoxLayout()
@@ -379,11 +385,18 @@ class OrdersUi(QWidget):
         self.prev_page_btn.setAccessibleName("Previous Page Button")
         self.prev_page_btn.setFocusPolicy(Qt.StrongFocus)
         self.prev_page_btn.clicked.connect(self.prev_page)
+        self.prev_page_btn.setFixedWidth(100)
+        self.prev_page_btn.setFixedHeight(32)
+        self.prev_page_btn.setStyleSheet("padding: 6px 16px; border-radius: 4px; background: #1976d2; color: white; font-weight: bold; font-size: 14px;")
+        self.page_label = QLabel("")
+        self.page_label.setStyleSheet("font-size: 14px; font-weight: bold; padding: 0 16px;")
         self.next_page_btn = QPushButton("Next")
         self.next_page_btn.setAccessibleName("Next Page Button")
         self.next_page_btn.setFocusPolicy(Qt.StrongFocus)
         self.next_page_btn.clicked.connect(self.next_page)
-        self.page_label = QLabel("")
+        self.next_page_btn.setFixedWidth(100)
+        self.next_page_btn.setFixedHeight(32)
+        self.next_page_btn.setStyleSheet("padding: 6px 16px; border-radius: 4px; background: #1976d2; color: white; font-weight: bold; font-size: 14px;")
         pagination_layout.addWidget(self.prev_page_btn)
         pagination_layout.addWidget(self.page_label)
         pagination_layout.addWidget(self.next_page_btn)
@@ -456,6 +469,7 @@ class OrdersUi(QWidget):
         order_date = self.orders_table.item(selected, 1).text()
         supplier_name = self.orders_table.item(selected, 2).text()
         order_items = self.get_order_items_for_order(order_id)
+        from dialogs import SupplierInfoDialog
         dialog = SupplierInfoDialog(self)
         if dialog.exec_() == QDialog.Accepted:
             supplier_info = dialog.get_data()
@@ -464,6 +478,7 @@ class OrdersUi(QWidget):
                 return
             supplier_info['order_id'] = order_id
             supplier_info['order_date'] = order_date
+            from order_manager import OrderManager
             manager = OrderManager()
             self.show_loading("Sending order to supplier...")
             try:
@@ -525,11 +540,11 @@ class OrdersUi(QWidget):
         end = start + self.page_size
         paged_orders = orders[start:end]
         self.orders_table.setRowCount(len(paged_orders))
-        self.orders_table.setColumnCount(6)
+        self.orders_table.setColumnCount(7)  # 6 + 1 for Completed button
         self.orders_table.setHorizontalHeaderLabels([
-            "Order ID", "Date", "Supplier", "Items", "Total", "Status"
-        ])
+            "Order ID", "Date", "Supplier", "Items", "Total", "Status", ""])
         self.orders_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        from PyQt5.QtWidgets import QPushButton
         for row, order in enumerate(paged_orders):
             self.orders_table.setItem(row, 0, QTableWidgetItem(str(order.id)))
             self.orders_table.setItem(row, 1, QTableWidgetItem(order.timestamp))
@@ -540,6 +555,14 @@ class OrdersUi(QWidget):
             total = sum([med.order_quantity or 0 for med in order.meds])
             self.orders_table.setItem(row, 4, QTableWidgetItem(str(total)))
             self.orders_table.setItem(row, 5, QTableWidgetItem(order.status))
+            # Add Completed button if not completed
+            if order.status.lower() != "completed":
+                btn = QPushButton("Completed")
+                btn.setStyleSheet("padding: 4px 12px; border-radius: 4px; background: #43a047; color: white; font-weight: bold;")
+                btn.clicked.connect(lambda checked, oid=order.id: self.mark_order_completed(oid))
+                self.orders_table.setCellWidget(row, 6, btn)
+            else:
+                self.orders_table.setCellWidget(row, 6, None)
         # Update pagination label and button states
         total_pages = max(1, (total_orders + self.page_size - 1) // self.page_size)
         self.page_label.setText(f"Page {self.current_page + 1} of {total_pages}")
@@ -641,10 +664,10 @@ class OrdersUi(QWidget):
         try:
             success, error = self.main_window.order_service.delete(order_id)
             if success:
-                self.show_banner("Order deleted successfully.", success=True)
+                QMessageBox.information(self, "Order Deleted", f"Order {order_id} has been deleted.")
                 self.refresh_orders_table()
             else:
-                self.show_banner(f"Failed to delete order: {error}", success=False)
+                QMessageBox.warning(self, "Error", f"Failed to delete order: {error}")
         finally:
             self.hide_loading()
 
@@ -698,6 +721,8 @@ class OrdersUi(QWidget):
             if success:
                 QMessageBox.information(self, "Order Updated", "Order has been updated successfully.")
                 self.refresh_orders_table()
+                # Show updated order details window with new supplier
+                self.view_order_details(order_id, supplier=new_supplier)
             else:
                 QMessageBox.warning(self, "Error", f"Failed to update order: {error}")
 
@@ -790,16 +815,24 @@ class OrdersUi(QWidget):
         elif action == delete_action:
             self.delete_order(int(order_id))
 
-    def view_order_details(self, order_id):
+    def view_order_details(self, order_id, supplier=None):
         from db import get_all_orders
         orders = get_all_orders()
         order = next((o for o in orders if str(o.id) == str(order_id)), None)
         if not order:
             QMessageBox.warning(self, "Error", f"Order {order_id} not found.")
             return
-        dialog = OrderDetailsDialog(order, self)
+        dialog = OrderDetailsDialog(order, self, supplier=supplier)
         dialog.exec_()
 
     def _on_table_double_clicked(self, row, col):
         order_id = self.orders_table.item(row, 0).text()
         self.view_order_details(order_id) 
+
+    def mark_order_completed(self, order_id):
+        from db import update_order_status
+        if update_order_status(order_id, "completed"):
+            self.show_banner(f"Order {order_id} marked as completed.", success=True)
+            self.refresh_orders_table()
+        else:
+            self.show_banner(f"Failed to mark order {order_id} as completed.", success=False) 
