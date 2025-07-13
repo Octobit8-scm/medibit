@@ -14,9 +14,10 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest]
-        python-version: [3.8, 3.9, 3.10, 3.11, 3.12]
+        python-version: [3.8, 3.9, 3.10.11, 3.11, 3.12]
 
     steps:
       - name: Checkout code
