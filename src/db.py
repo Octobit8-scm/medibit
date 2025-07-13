@@ -714,3 +714,20 @@ def update_order_file_path(order_id: int, file_path: str) -> None:
     order.file_path = file_path
     session.commit()
     session.close()
+
+
+def clear_all_orders() -> None:
+    """
+    Delete all orders and their medicines from the database.
+    """
+    session = Session()
+    try:
+        session.query(OrderMedicine).delete()
+        session.query(Order).delete()
+        session.commit()
+        return True
+    except Exception as e:
+        session.rollback()
+        return False
+    finally:
+        session.close()
