@@ -9,7 +9,8 @@ from src.settings_service import SettingsService
 from src.license_utils import generate_license_key
 
 import pytest
-from PyQt5.QtWidgets import QMessageBox, QDialog
+from PyQt5.QtWidgets import QMessageBox, QDialog, QFileDialog, QColorDialog, QInputDialog, QMenu
+from PyQt5.QtGui import QColor
 
 @pytest.fixture(autouse=True)
 def patch_messageboxes_and_dialogs(monkeypatch):
@@ -24,6 +25,43 @@ def patch_messageboxes_and_dialogs(monkeypatch):
     def auto_accept(self, *a, **k):
         return QDialog.Accepted
     monkeypatch.setattr(QDialog, "exec_", auto_accept)
+    
+    # Patch QFileDialog to auto-return values
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *a, **k: ("test.xlsx", "Excel Files (*.xlsx)"))
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *a, **k: ("output.pdf", "PDF Files (*.pdf)"))
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *a, **k: "test_dir")
+    
+    # Patch QColorDialog to auto-return a color
+    monkeypatch.setattr(QColorDialog, "getColor", lambda *a, **k: QColor(255, 255, 255))
+    
+    # Patch QInputDialog to auto-return text
+    monkeypatch.setattr(QInputDialog, "getText", lambda *a, **k: ("TestInput", True))
+
+    # Patch custom dialogs in orders and sales to auto-accept and return default data
+    import src.dialogs as dialogs_mod
+    class FakeSupplierInfoDialog:
+        def exec_(self):
+            return QDialog.Accepted
+        def get_data(self):
+            return {"email": "supplier@example.com", "phone": "1234567890"}
+    class FakeOrderQuantityDialog:
+        def exec_(self):
+            return QDialog.Accepted
+        def get_order_quantities(self):
+            return {"TESTBARCODE": 10}
+    monkeypatch.setattr(dialogs_mod, "SupplierInfoDialog", FakeSupplierInfoDialog)
+    monkeypatch.setattr(dialogs_mod, "OrderQuantityDialog", FakeOrderQuantityDialog)
+    # Add more custom dialog patches here as needed
+
+    # Patch QMenu.exec_ to auto-trigger the first action
+    def fake_qmenu_exec(self, *args, **kwargs):
+        actions = self.actions()
+        if actions:
+            actions[0].trigger()
+            return actions[0]
+        return None
+    monkeypatch.setattr(QMenu, "exec_", fake_qmenu_exec)
+
     yield
     # Optionally restore original exec_ if needed
     monkeypatch.setattr(QDialog, "exec_", original_exec)

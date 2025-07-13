@@ -1,0 +1,24 @@
+{
+  "customer": {
+    "name": "",
+    "age": 25,
+    "gender": "Male",
+    "phone": "",
+    "email": "",
+    "address": ""
+  },
+  "items": [
+    {
+      "barcode": "TEST123",
+      "name": "TestMed",
+      "quantity": "1",
+      "price": "50",
+      "tax": "0",
+      "discount": "0"
+    }
+  ],
+  "tax": 0.0,
+  "discount": 0.0,
+  "subtotal": "Subtotal: ₹50.00",
+  "total": "Total: ₹50.00"
+}
