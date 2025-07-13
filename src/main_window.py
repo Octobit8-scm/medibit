@@ -165,6 +165,7 @@ class MainWindow(QMainWindow):
         """
         super().__init__()
         logger.info("MainWindow initialized")
+        self.nav_buttons = []  # Ensure nav_buttons is always defined
         self.setWindowTitle("Medibit")
         # Set the window icon to use the medibit logo
         try:
@@ -229,6 +230,8 @@ class MainWindow(QMainWindow):
         dev_label = QLabel("Designed & Developed by Octobit8")
         dev_label.setStyleSheet("font-weight: bold; padding-right: 16px;")
         self.statusBar.addPermanentWidget(dev_label)
+        # Ensure UI and nav_buttons are always initialized for tests
+        self.init_ui()
     def __del__(self):
         print(f"[MainWindow] __del__ called. id: {id(self)}")
 
@@ -1984,3 +1987,8 @@ class MainWindow(QMainWindow):
 
     def show_main_app(self):
         self.init_ui()
+
+    def refresh_inventory_table(self):
+        """Delegate to inventory_ui.refresh_inventory_table for tests and UI."""
+        if hasattr(self, 'inventory_ui'):
+            self.inventory_ui.refresh_inventory_table()

@@ -69,7 +69,11 @@ class SalesUi(QWidget):
         self.feedback_banner.setStyleSheet(f"background: {color}; color: white; padding: 8px; border-radius: 4px; font-weight: bold; font-size: 14px;")
         self.feedback_banner.setText(message)
         self.feedback_banner.setVisible(True)
-        QTimer.singleShot(3000, lambda: self.feedback_banner.setVisible(False))
+        def safe_hide():
+            if self.feedback_banner and not sip.isdeleted(self.feedback_banner):
+                self.feedback_banner.setVisible(False)
+        import sip
+        QTimer.singleShot(3000, safe_hide)
 
     def init_ui(self):
         layout = QVBoxLayout(self)

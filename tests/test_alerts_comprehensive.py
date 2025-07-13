@@ -36,10 +36,17 @@ def sample_medicine():
 
 class TestAlertsUi:
     def test_feedback_banner(self, alerts_ui, qtbot):
+        alerts_ui.show()
+        qtbot.waitExposed(alerts_ui)
         alerts_ui.show_banner("Test Success", success=True)
+        qtbot.wait(10)
         assert alerts_ui.feedback_banner.isVisible()
+        # Wait for the banner to be hidden after 3 seconds
+        qtbot.waitUntil(lambda: not alerts_ui.feedback_banner.isVisible(), timeout=3500)
         alerts_ui.show_banner("Test Error", success=False)
+        qtbot.wait(10)
         assert alerts_ui.feedback_banner.isVisible()
+        qtbot.waitUntil(lambda: not alerts_ui.feedback_banner.isVisible(), timeout=3500)
 
     def test_loading_overlay(self, alerts_ui, qtbot):
         alerts_ui.show_loading("Loading...")

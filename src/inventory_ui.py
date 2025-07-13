@@ -70,6 +70,7 @@ class InventoryProgressDialog(QDialog):
             self.label.setText(label_text)
         QApplication.processEvents()
     def complete(self, done_label="Operation complete."):
+        self.progress_bar.setValue(self.progress_bar.maximum())
         self.ok_btn.setEnabled(True)
         self.cancel_btn.hide()
         self.label.setText(done_label)
@@ -83,10 +84,10 @@ class ImportWorker(QObject):
     def __init__(self, df, parent=None):
         super().__init__(parent)
         self.df = df
-        self._cancel = False
+        self._canceled = False  # Use _canceled for consistency
 
     def cancel(self):
-        self._cancel = True
+        self._canceled = True
 
     def run(self):
         imported, updated, errors = 0, 0, 0
@@ -95,7 +96,7 @@ class ImportWorker(QObject):
         try:
             log_memory_usage("import worker start")
             for idx, row in self.df.iterrows():
-                if self._cancel:
+                if self._canceled:
                     self.canceled.emit()
                     for handler in logging.root.handlers:
                         handler.flush()
@@ -194,17 +195,17 @@ class ExportWorker(QObject):
         super().__init__()
         self.medicines = medicines
         self.file_path = file_path
-        self._cancel = False
+        self._canceled = False  # Use _canceled for consistency
 
     def cancel(self):
-        self._cancel = True
+        self._canceled = True
 
     def run(self):
         try:
             data = []
             row_count = len(self.medicines)
             for idx, med in enumerate(self.medicines):
-                if self._cancel:
+                if self._canceled:
                     self.canceled.emit()
                     return
                 # Build dict for each medicine
@@ -599,7 +600,7 @@ class InventoryUi(QWidget):
         # Stock status filter
         stock_filter = self.stock_filter.currentText()
         if stock_filter == "Low Stock":
-            filtered = [m for m in filtered if hasattr(m, 'threshold') and m.quantity <= m.threshold]
+            filtered = [m for m in filtered if hasattr(m, 'threshold') and m.quantity > 0 and m.quantity <= m.threshold]
         elif stock_filter == "Out of Stock":
             filtered = [m for m in filtered if m.quantity == 0]
         elif stock_filter == "In Stock":
@@ -608,16 +609,16 @@ class InventoryUi(QWidget):
         # Expiry filter
         expiry_filter = self.expiry_filter.currentText()
         if expiry_filter == "Expired":
-            filtered = [m for m in filtered if m.expiry and m.expiry <= date.today()]
+            filtered = [m for m in filtered if m.expiry and m.expiry < date.today()]
         elif expiry_filter == "Expiring Soon (30 days)":
             filtered = [m for m in filtered if m.expiry and (m.expiry - date.today()).days <= 30 and m.expiry > date.today()]
         elif expiry_filter == "Valid":
             filtered = [m for m in filtered if m.expiry and m.expiry > date.today()]
         
-        # Manufacturer filter
+        # Manufacturer filter (normalize for comparison)
         manufacturer_filter = self.manufacturer_filter.currentText()
         if manufacturer_filter != "All":
-            filtered = [m for m in filtered if m.manufacturer == manufacturer_filter]
+            filtered = [m for m in filtered if (m.manufacturer or "").strip().lower() == manufacturer_filter.strip().lower()]
         
         return filtered
 

@@ -212,8 +212,15 @@ def update_medicine_threshold(barcode: str, threshold: int) -> tuple:
 
 
 def update_medicine(barcode: str, name: str, quantity: int, expiry, manufacturer: str, price: int, threshold: int) -> tuple:
+    import datetime
     session = Session()
     try:
+        # Convert expiry to date if it's a string
+        if isinstance(expiry, str):
+            try:
+                expiry = datetime.datetime.strptime(expiry, "%Y-%m-%d").date()
+            except Exception:
+                expiry = None
         medicine = session.query(Medicine).filter_by(barcode=barcode).first()
         if medicine:
             medicine.name = name
@@ -251,8 +258,15 @@ def update_medicine_quantity(barcode: str, new_quantity: int) -> tuple:
 
 
 def add_medicine(barcode: str, name: str, quantity: int, expiry, manufacturer: str, price: int = 0, threshold: int = 10) -> tuple:
+    import datetime
     session = Session()
     try:
+        # Convert expiry to date if it's a string
+        if isinstance(expiry, str):
+            try:
+                expiry = datetime.datetime.strptime(expiry, "%Y-%m-%d").date()
+            except Exception:
+                expiry = None
         existing_medicine = session.query(Medicine).filter_by(barcode=barcode).first()
         if existing_medicine:
             existing_medicine.name = name
@@ -262,26 +276,20 @@ def add_medicine(barcode: str, name: str, quantity: int, expiry, manufacturer: s
             existing_medicine.price = price
             existing_medicine.threshold = threshold
             session.commit()
-            return (
-                True,
-                f"Updated existing medicine '{name}' and added {quantity} units",
-            )
+            return True, None
         else:
-            med = Medicine(
+            new_medicine = Medicine(
                 barcode=barcode,
                 name=name,
                 quantity=quantity,
                 expiry=expiry,
                 manufacturer=manufacturer,
                 price=price,
-                threshold=threshold,
+                threshold=threshold
             )
-            session.add(med)
+            session.add(new_medicine)
             session.commit()
-            return True, f"Added new medicine '{name}'"
-    except IntegrityError as e:
-        session.rollback()
-        return False, str(e)
+            return True, None
     except Exception as e:
         session.rollback()
         return False, str(e)

@@ -432,11 +432,13 @@ class OrdersUi(QWidget):
         QApplication.processEvents()
 
     def show_banner(self, message, success=True):
+        import weakref
         color = "#43a047" if success else "#e53935"
         self.feedback_banner.setStyleSheet(f"background: {color}; color: white; padding: 8px; border-radius: 4px; font-weight: bold; font-size: 14px;")
         self.feedback_banner.setText(message)
         self.feedback_banner.setVisible(True)
-        QTimer.singleShot(3000, lambda: self.feedback_banner.setVisible(False))
+        banner_ref = weakref.ref(self.feedback_banner)
+        QTimer.singleShot(3000, lambda: banner_ref() and banner_ref().setVisible(False))
 
     def open_create_order_dialog(self):
         dialog = CreateOrderDialog(self)

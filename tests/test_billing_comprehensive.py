@@ -13,6 +13,16 @@ from src.billing_service import BillingService
 from src.db import add_bill, get_all_bills, clear_all_bills, get_pharmacy_details
 from src.dialogs import AddMedicineDialog
 
+# Patch QMessageBox globally for all tests in this file
+def noop(*args, **kwargs):
+    return None
+
+@pytest.fixture(autouse=True)
+def patch_qmessagebox(monkeypatch):
+    monkeypatch.setattr(QMessageBox, "warning", noop)
+    monkeypatch.setattr(QMessageBox, "critical", noop)
+    yield
+
 
 @pytest.fixture(autouse=True)
 def setup_billing():
@@ -57,7 +67,7 @@ def mock_main_window():
 
 
 @pytest.fixture
-def billing_ui(mock_main_window):
+def billing_ui(qapp, mock_main_window):
     """Create a BillingUi instance for testing"""
     return BillingUi(mock_main_window)
 
@@ -107,7 +117,7 @@ def sample_billing_items():
 class TestBillingValidation:
     """Test billing validation functionality"""
     
-    def test_validate_customer_info_valid_data(self, billing_ui, sample_customer):
+    def test_validate_customer_info_valid_data(self, qapp, billing_ui, sample_customer):
         """Test validation with valid customer data"""
         billing_ui.customer_name.setText(sample_customer["name"])
         billing_ui.customer_age.setValue(sample_customer["age"])
@@ -118,7 +128,7 @@ class TestBillingValidation:
         
         assert billing_ui.validate_customer_info() is True
     
-    def test_validate_customer_info_empty_name(self, billing_ui, sample_customer):
+    def test_validate_customer_info_empty_name(self, qapp, billing_ui, sample_customer):
         """Test validation with empty name"""
         billing_ui.customer_name.setText("")
         billing_ui.customer_age.setValue(sample_customer["age"])
@@ -129,9 +139,10 @@ class TestBillingValidation:
         
         assert billing_ui.validate_customer_info() is False
     
-    def test_validate_customer_info_invalid_age(self, billing_ui, sample_customer):
+    def test_validate_customer_info_invalid_age(self, qapp, billing_ui, sample_customer):
         """Test validation with invalid age"""
         billing_ui.customer_name.setText(sample_customer["name"])
+        billing_ui.customer_age.setMinimum(0)  # Allow setting age to 0 for test
         billing_ui.customer_age.setValue(0)  # Invalid age
         billing_ui.customer_gender.setCurrentText(sample_customer["gender"])
         billing_ui.customer_phone.setText(sample_customer["phone"])
@@ -140,7 +151,7 @@ class TestBillingValidation:
         
         assert billing_ui.validate_customer_info() is False
     
-    def test_validate_customer_info_invalid_phone(self, billing_ui, sample_customer):
+    def test_validate_customer_info_invalid_phone(self, qapp, billing_ui, sample_customer):
         """Test validation with invalid phone number"""
         billing_ui.customer_name.setText(sample_customer["name"])
         billing_ui.customer_age.setValue(sample_customer["age"])
@@ -151,7 +162,7 @@ class TestBillingValidation:
         
         assert billing_ui.validate_customer_info() is False
     
-    def test_validate_customer_info_invalid_email(self, billing_ui, sample_customer):
+    def test_validate_customer_info_invalid_email(self, qapp, billing_ui, sample_customer):
         """Test validation with invalid email"""
         billing_ui.customer_name.setText(sample_customer["name"])
         billing_ui.customer_age.setValue(sample_customer["age"])
@@ -162,7 +173,7 @@ class TestBillingValidation:
         
         assert billing_ui.validate_customer_info() is False
     
-    def test_validate_customer_info_empty_address(self, billing_ui, sample_customer):
+    def test_validate_customer_info_empty_address(self, qapp, billing_ui, sample_customer):
         """Test validation with empty address"""
         billing_ui.customer_name.setText(sample_customer["name"])
         billing_ui.customer_age.setValue(sample_customer["age"])
@@ -173,11 +184,11 @@ class TestBillingValidation:
         
         assert billing_ui.validate_customer_info() is False
     
-    def test_validate_billing_items_empty_table(self, billing_ui):
+    def test_validate_billing_items_empty_table(self, qapp, billing_ui):
         """Test validation with empty billing table"""
         assert billing_ui.validate_billing_items() is False
     
-    def test_validate_billing_items_valid_data(self, billing_ui, sample_billing_items):
+    def test_validate_billing_items_valid_data(self, qapp, billing_ui, sample_billing_items):
         """Test validation with valid billing items"""
         # Add items to table
         for i, item in enumerate(sample_billing_items):
@@ -191,7 +202,7 @@ class TestBillingValidation:
         
         assert billing_ui.validate_billing_items() is True
     
-    def test_validate_billing_items_duplicate_barcode(self, billing_ui, sample_billing_items):
+    def test_validate_billing_items_duplicate_barcode(self, qapp, billing_ui, sample_billing_items):
         """Test validation with duplicate barcodes"""
         # Add items with duplicate barcode
         for i, item in enumerate(sample_billing_items):
@@ -205,7 +216,7 @@ class TestBillingValidation:
         
         assert billing_ui.validate_billing_items() is False
     
-    def test_validate_billing_items_invalid_quantity(self, billing_ui, sample_billing_items):
+    def test_validate_billing_items_invalid_quantity(self, qapp, billing_ui, sample_billing_items):
         """Test validation with invalid quantity"""
         billing_ui.billing_table.insertRow(0)
         billing_ui.billing_table.setItem(0, 0, QTableWidgetItem(sample_billing_items[0]["barcode"]))
@@ -217,7 +228,7 @@ class TestBillingValidation:
         
         assert billing_ui.validate_billing_items() is False
     
-    def test_validate_billing_items_negative_price(self, billing_ui, sample_billing_items):
+    def test_validate_billing_items_negative_price(self, qapp, billing_ui, sample_billing_items):
         """Test validation with negative price"""
         billing_ui.billing_table.insertRow(0)
         billing_ui.billing_table.setItem(0, 0, QTableWidgetItem(sample_billing_items[0]["barcode"]))
@@ -229,7 +240,7 @@ class TestBillingValidation:
         
         assert billing_ui.validate_billing_items() is False
     
-    def test_validate_bill_comprehensive(self, billing_ui, sample_customer, sample_billing_items):
+    def test_validate_bill_comprehensive(self, qapp, billing_ui, sample_customer, sample_billing_items):
         """Test comprehensive bill validation"""
         # Set valid customer info
         billing_ui.customer_name.setText(sample_customer["name"])

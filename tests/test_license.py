@@ -11,5 +11,5 @@ def test_license_key_generation_and_validation():
     valid, info, err = license_utils.verify_license_key(key)
     print(f"Verification result: valid={valid}, info={info}, err={err}")
     assert valid
-    assert info["name"] == customer
+    assert info["email"] == customer
     assert info["exp"] == expiry

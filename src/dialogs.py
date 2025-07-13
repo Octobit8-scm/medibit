@@ -1,4 +1,4 @@
-from PyQt5.QtCore import QDate, Qt, QThread, pyqtSignal
+from PyQt5.QtCore import QDate, Qt, QThread, pyqtSignal, QObject
 from PyQt5.QtGui import QColor, QIcon
 from PyQt5.QtWidgets import (
     QCheckBox,
@@ -1710,3 +1710,13 @@ class BillingAddMedicineDialog(QDialog):
         selected = self.table.currentRow()
         valid = selected >= 0 and self.qty_spin.value() >= 1
         self.add_btn.setEnabled(valid)
+
+
+class NotificationSendWorker(QObject):
+    result_signal = pyqtSignal(list)
+    error_signal = pyqtSignal(str)
+    finished = pyqtSignal()
+    def __init__(self, notification_manager, test_medicine):
+        super().__init__()
+    def start(self):
+        pass

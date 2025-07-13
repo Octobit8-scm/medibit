@@ -15,7 +15,11 @@ def setup_orders():
 
 @pytest.fixture
 def mock_main_window():
-    return Mock()
+    mock = Mock()
+    mock.order_service.add.return_value = (True, None)
+    mock.order_service.delete.return_value = (True, None)
+    mock.order_service.update.return_value = (True, None)
+    return mock
 
 @pytest.fixture
 def orders_ui(qtbot, mock_main_window):

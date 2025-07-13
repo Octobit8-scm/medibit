@@ -28,26 +28,29 @@ class InventoryService:
             logging.error(f"Error fetching all medicines: {e}", exc_info=True)
             return []
 
-    def add(self, med_data):
-        logger.debug(f"[add] ENTRY: barcode={med_data.get('barcode', 'N/A')}")
+    def add(self, data):
+        logger.debug(f"[add] ENTRY: barcode={data.get('barcode', 'N/A')}")
         try:
-            barcode = med_data["barcode"]
+            barcode = data["barcode"]
             existing = [m for m in get_all_medicines() if m.barcode == barcode]
             if existing:
                 logger.warning(f"Attempted to add duplicate barcode: {barcode}")
                 return False, "A medicine with this barcode already exists."
             result = add_medicine(
-                med_data["barcode"],
-                med_data["name"],
-                med_data["quantity"],
-                med_data["expiry"],
-                med_data["manufacturer"],
-                med_data["price"],
-                med_data["threshold"],
+                data["barcode"],
+                data["name"],
+                data["quantity"],
+                data["expiry"],
+                data["manufacturer"],
+                data.get("price", 0),
+                data.get("threshold", 10),
             )
             logger.info(f"Medicine added: {barcode}")
             logger.debug(f"[add] EXIT: success, barcode={barcode}")
-            return True, "Added"
+            if result[0]:
+                return True, None
+            else:
+                return False, result[1]
         except Exception as e:
             logger.error(f"[add] Exception: {e}", exc_info=True)
             return False, str(e)
@@ -55,7 +58,7 @@ class InventoryService:
     def update(self, barcode: str, data: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
         logger.debug(f"[update] ENTRY: barcode={barcode}, data={data}")
         try:
-            result = update_medicine(
+            result, msg = update_medicine(
                 barcode,
                 data["name"],
                 data["quantity"],
@@ -66,7 +69,10 @@ class InventoryService:
             )
             logging.info(f"Updated medicine: {barcode}, result: {result}")
             logger.debug(f"[update] EXIT: success, barcode={barcode}")
-            return result
+            if result:
+                return True, "Updated"
+            else:
+                return False, msg
         except Exception as e:
             logging.error(f"[update] Exception: {e}", exc_info=True)
             return False, str(e)
@@ -74,10 +80,13 @@ class InventoryService:
     def update_quantity(self, barcode: str, quantity: int) -> Tuple[bool, Optional[str]]:
         logger.debug(f"[update_quantity] ENTRY: barcode={barcode}, quantity={quantity}")
         try:
-            result = update_medicine_quantity(barcode, quantity), None
+            result, msg = update_medicine_quantity(barcode, quantity)
             logging.info(f"Updated quantity for {barcode} to {quantity}, result: {result}")
             logger.debug(f"[update_quantity] EXIT: success, barcode={barcode}")
-            return result
+            if result:
+                return True, "Quantity Updated"
+            else:
+                return False, msg
         except Exception as e:
             logging.error(f"[update_quantity] Exception: {e}", exc_info=True)
             return False, str(e)
@@ -85,11 +94,14 @@ class InventoryService:
     def delete(self, barcode: str) -> Tuple[bool, Optional[str]]:
         logger.debug(f"[delete] ENTRY: barcode={barcode}")
         try:
-            result = delete_medicine(barcode)
+            result, msg = delete_medicine(barcode)
             logging.info(f"Deleted medicine: {barcode}, result: {result}")
             logger.info("Medicine deleted from inventory.")
             logger.debug(f"[delete] EXIT: success, barcode={barcode}")
-            return result
+            if result:
+                return True, "Deleted"
+            else:
+                return False, msg
         except Exception as e:
             logging.error(f"[delete] Exception: {e}", exc_info=True)
             return False, str(e)
@@ -97,10 +109,13 @@ class InventoryService:
     def clear(self) -> Tuple[bool, Optional[str]]:
         logger.debug(f"[clear] ENTRY")
         try:
-            result = clear_inventory()
+            result, msg = clear_inventory()
             logging.info(f"Cleared inventory, result: {result}")
             logger.debug(f"[clear] EXIT: success")
-            return result
+            if result:
+                return True, "Cleared"
+            else:
+                return False, msg
         except Exception as e:
             logging.error(f"[clear] Exception: {e}", exc_info=True)
             return False, str(e)

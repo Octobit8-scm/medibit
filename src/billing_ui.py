@@ -260,10 +260,30 @@ class BillingUi(QWidget):
     def validate_customer_info(self):
         """Validate customer information fields"""
         name = self.customer_name.text().strip()
+        age = self.customer_age.value()
+        phone = self.customer_phone.text().strip()
+        email = self.customer_email.text().strip()
+        address = self.customer_address.text().strip()
+        # Name
         if not name:
             QMessageBox.warning(self, "Validation Error", "Customer name is required to finalize the bill.")
             return False
-        # Optionally, add more validation for phone, email, etc.
+        # Age
+        if age < 1:
+            QMessageBox.warning(self, "Validation Error", "Customer age must be greater than 0.")
+            return False
+        # Phone (must be at least 10 digits and numeric)
+        if not (phone.isdigit() and len(phone) >= 10):
+            QMessageBox.warning(self, "Validation Error", "Customer phone must be at least 10 digits and numeric.")
+            return False
+        # Email (must contain '@' and '.')
+        if '@' not in email or '.' not in email:
+            QMessageBox.warning(self, "Validation Error", "Customer email must be valid (contain '@' and '.').")
+            return False
+        # Address
+        if not address:
+            QMessageBox.warning(self, "Validation Error", "Customer address is required.")
+            return False
         return True
 
     def validate_billing_items(self):

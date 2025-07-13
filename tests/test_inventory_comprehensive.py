@@ -51,8 +51,9 @@ def mock_main_window():
 
 
 @pytest.fixture
-def inventory_ui(mock_main_window):
+def inventory_ui(qapp, mock_main_window):
     """Create an InventoryUi instance for testing"""
+    from src.inventory_ui import InventoryUi
     return InventoryUi(mock_main_window)
 
 
@@ -328,19 +329,23 @@ class TestInventoryFiltering:
         assert len(filtered) == 1
         assert filtered[0].barcode == "TEST004"  # ExpiringSoon
     
-    def test_apply_advanced_filters_manufacturer(self, inventory_ui, sample_medicines):
+    def test_apply_advanced_filters_manufacturer(self, inventory_ui, sample_medicines, qtbot):
         """Test filtering by manufacturer"""
         medicines = get_all_medicines()
+        inventory_ui.populate_manufacturer_filter()
         inventory_ui.manufacturer_filter.setCurrentText("PharmaA")
+        qtbot.wait(100)  # Allow UI to process filter change
         filtered = inventory_ui.apply_advanced_filters(medicines)
         assert len(filtered) == 2  # Aspirin and ExpiringSoon
         assert all(m.manufacturer == "PharmaA" for m in filtered)
     
-    def test_apply_advanced_filters_combined(self, inventory_ui, sample_medicines):
+    def test_apply_advanced_filters_combined(self, inventory_ui, sample_medicines, qtbot):
         """Test combining multiple filters"""
         medicines = get_all_medicines()
+        inventory_ui.populate_manufacturer_filter()
         inventory_ui.stock_filter.setCurrentText("In Stock")
         inventory_ui.manufacturer_filter.setCurrentText("PharmaA")
+        qtbot.wait(100)
         filtered = inventory_ui.apply_advanced_filters(medicines)
         assert len(filtered) == 2  # Aspirin and ExpiringSoon from PharmaA that are in stock
 
@@ -348,25 +353,32 @@ class TestInventoryFiltering:
 class TestInventoryUIComponents:
     """Test inventory UI components"""
     
-    def test_inventory_ui_initialization(self, inventory_ui):
+    def test_inventory_ui_initialization(self, qapp, inventory_ui, qtbot):
         """Test inventory UI initialization"""
+        inventory_ui.show()
+        qtbot.waitExposed(inventory_ui)
         assert inventory_ui.inventory_table is not None
         assert inventory_ui.add_medicine_btn is not None
         assert inventory_ui.search_box is not None
         assert inventory_ui.export_btn is not None
         assert inventory_ui.import_btn is not None
     
-    def test_refresh_inventory_table(self, inventory_ui, sample_medicines):
+    def test_refresh_inventory_table(self, qapp, inventory_ui, sample_medicines, qtbot):
         """Test refreshing inventory table"""
+        inventory_ui.show()
+        qtbot.waitExposed(inventory_ui)
         inventory_ui.refresh_inventory_table()
+        qtbot.wait(100)  # Allow UI to update
         assert inventory_ui.inventory_table.rowCount() == len(sample_medicines)
     
-    def test_filter_inventory_table(self, inventory_ui, sample_medicines):
+    def test_filter_inventory_table(self, inventory_ui, sample_medicines, qtbot):
         """Test filtering inventory table"""
+        inventory_ui.show()
+        qtbot.waitExposed(inventory_ui)
         inventory_ui.refresh_inventory_table()
         inventory_ui.search_box.setText("Aspirin")
         inventory_ui.filter_inventory_table()
-        
+        qtbot.wait(100)
         # Should show only Aspirin
         visible_rows = 0
         for row in range(inventory_ui.inventory_table.rowCount()):
@@ -374,8 +386,10 @@ class TestInventoryUIComponents:
                 visible_rows += 1
         assert visible_rows == 1
     
-    def test_populate_manufacturer_filter(self, inventory_ui, sample_medicines):
+    def test_populate_manufacturer_filter(self, inventory_ui, sample_medicines, qtbot):
         """Test populating manufacturer filter"""
+        inventory_ui.show()
+        qtbot.waitExposed(inventory_ui)
         inventory_ui.populate_manufacturer_filter()
         manufacturers = [inventory_ui.manufacturer_filter.itemText(i) 
                         for i in range(inventory_ui.manufacturer_filter.count())]
@@ -385,19 +399,19 @@ class TestInventoryUIComponents:
         assert "PharmaC" in manufacturers
         assert "PharmaD" in manufacturers
     
-    def test_clear_filters(self, inventory_ui, sample_medicines):
+    def test_clear_filters(self, inventory_ui, sample_medicines, qtbot):
         """Test clearing all filters"""
+        inventory_ui.show()
+        qtbot.waitExposed(inventory_ui)
         inventory_ui.refresh_inventory_table()
-        
         # Set some filters
         inventory_ui.search_box.setText("test")
         inventory_ui.stock_filter.setCurrentText("Low Stock")
         inventory_ui.expiry_filter.setCurrentText("Expired")
         inventory_ui.manufacturer_filter.setCurrentText("PharmaA")
-        
         # Clear filters
         inventory_ui.clear_filters()
-        
+        qtbot.wait(100)
         assert inventory_ui.search_box.text() == ""
         assert inventory_ui.stock_filter.currentText() == "All"
         assert inventory_ui.expiry_filter.currentText() == "All"

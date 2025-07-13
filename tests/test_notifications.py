@@ -9,6 +9,7 @@ import os
 from PyQt5.QtWidgets import QApplication
 import pytestqt
 from src.dialogs import NotificationSettingsDialog
+from PyQt5.QtCore import Qt
 
 @pytest.fixture
 def notif_manager():
@@ -99,7 +100,11 @@ def test_notification_settings_dialog_ui_feedback(qtbot, monkeypatch):
     dialog = NotificationSettingsDialog()
     # Patch NotificationSendWorker to immediately emit result
     class FakeWorker:
-        def __init__(self, *a, **k): pass
+        def __init__(self, *a, **k):
+            from unittest.mock import Mock
+            self.result_signal = Mock()
+            self.error_signal = Mock()
+            self.finished = Mock()
         def start(self):
             dialog.on_test_notifications_result([
                 ('Email', True, 'ok'),

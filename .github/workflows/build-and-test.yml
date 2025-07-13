@@ -12,7 +12,11 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        python-version: [3.8, 3.10, 3.11]
 
     steps:
       - name: Checkout code
@@ -21,7 +25,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
@@ -55,17 +59,22 @@ jobs:
             ${{ runner.os }}-pyinstaller-
 
       - name: Cache Inno Setup
+        if: runner.os == 'Windows'
         uses: actions/cache@v4
         with:
-          path: C:\ProgramData\chocolatey\lib\innosetup
+          path: C:\\ProgramData\\chocolatey\\lib\\innosetup
           key: ${{ runner.os }}-innosetup
 
       - name: Debug Path
         run: |
           echo "PWD: $PWD"
-          echo "PYTHONPATH: $env:PYTHONPATH"
-          dir
-          dir tests
+          echo "PYTHONPATH: ${{ env.PYTHONPATH }}"
+          ls
+          ls tests
+
+      - name: Start Xvfb (Linux only)
+        if: runner.os == 'Linux'
+        uses: GabrielBB/xvfb-action@v1
 
       # - name: Static Analysis - isort
       #   run: isort --check --diff src/ tests/
@@ -77,12 +86,13 @@ jobs:
       #   run: flake8 src/ tests/
 
       - name: Run Tests with Coverage
-        shell: pwsh
+        shell: bash
         run: |
-          $env:PYTHONPATH="src"
+          export PYTHONPATH=src
           python -m pytest --cov=src --cov-report=xml --cov-report=term tests/ --disable-warnings -v
 
-      - name: Build EXE and Distribution Package
+      - name: Build EXE and Distribution Package (Windows only)
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           .\build_github_actions.ps1
